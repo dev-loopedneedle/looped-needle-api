@@ -1,0 +1,438 @@
+openapi: 3.1.0
+info:
+  title: Audits API
+  description: API endpoints for audit record management
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.looped-needle.com/api/v1
+    description: Production server
+
+tags:
+  - name: audits
+    description: Audit record operations
+
+paths:
+  /audits:
+    get:
+      summary: List audit records
+      description: Retrieve a paginated list of audit records with optional filtering
+      operationId: listAudits
+      tags:
+        - audits
+      parameters:
+        - name: action_type
+          in: query
+          description: Filter by action type
+          required: false
+          schema:
+            type: string
+            enum: [create, update, delete, view, export, import, login, logout, other]
+        - name: entity_type
+          in: query
+          description: Filter by entity type
+          required: false
+          schema:
+            type: string
+        - name: entity_id
+          in: query
+          description: Filter by entity ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by status
+          required: false
+          schema:
+            type: string
+            enum: [success, failure, pending]
+        - name: created_after
+          in: query
+          description: Filter by creation date (after)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: created_before
+          in: query
+          description: Filter by creation date (before)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Maximum number of records to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: offset
+          in: query
+          description: Number of records to skip
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordListResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create audit record
+      description: Create a new audit record
+      operationId: createAudit
+      tags:
+        - audits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditRecordCreate'
+      responses:
+        '201':
+          description: Audit record created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audits/{audit_id}:
+    get:
+      summary: Get audit record
+      description: Retrieve a specific audit record by ID
+      operationId: getAudit
+      tags:
+        - audits
+      parameters:
+        - name: audit_id
+          in: path
+          required: true
+          description: UUID of the audit record
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordResponse'
+        '404':
+          description: Audit record not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update audit record
+      description: Update an existing audit record (limited fields: status, details)
+      operationId: updateAudit
+      tags:
+        - audits
+      parameters:
+        - name: audit_id
+          in: path
+          required: true
+          description: UUID of the audit record
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditRecordUpdate'
+      responses:
+        '200':
+          description: Audit record updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Audit record not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete audit record
+      description: Delete an audit record (soft delete via status change recommended)
+      operationId: deleteAudit
+      tags:
+        - audits
+      parameters:
+        - name: audit_id
+          in: path
+          required: true
+          description: UUID of the audit record
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Audit record deleted successfully
+        '404':
+          description: Audit record not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AuditRecordCreate:
+      type: object
+      required:
+        - action_type
+        - entity_type
+        - entity_id
+      properties:
+        action_type:
+          type: string
+          enum: [create, update, delete, view, export, import, login, logout, other]
+          description: Type of action performed
+        entity_type:
+          type: string
+          maxLength: 100
+          description: Type of entity affected
+        entity_id:
+          type: string
+          format: uuid
+          description: Identifier of the affected entity
+        user_id:
+          type: string
+          format: uuid
+          description: Identifier of the user who performed the action
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional details about the action in JSON format
+        status:
+          type: string
+          enum: [success, failure, pending]
+          default: success
+          description: Status of the action
+        ip_address:
+          type: string
+          maxLength: 45
+          description: IP address of the requester
+        user_agent:
+          type: string
+          maxLength: 500
+          description: User agent string from the request
+
+    AuditRecordUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, failure, pending]
+          description: Status of the action
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional details about the action
+
+    AuditRecordResponse:
+      type: object
+      required:
+        - id
+        - action_type
+        - entity_type
+        - entity_id
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the audit record
+        action_type:
+          type: string
+          description: Type of action performed
+        entity_type:
+          type: string
+          description: Type of entity affected
+        entity_id:
+          type: string
+          format: uuid
+          description: Identifier of the affected entity
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identifier of the user who performed the action
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Additional details about the action
+        status:
+          type: string
+          description: Status of the action
+        ip_address:
+          type: string
+          nullable: true
+          description: IP address of the requester
+        user_agent:
+          type: string
+          nullable: true
+          description: User agent string from the request
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the audit record was created
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the audit record was last updated
+
+    AuditRecordListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditRecordResponse'
+        total:
+          type: integer
+          description: Total number of records matching the query
+        limit:
+          type: integer
+          description: Maximum number of records returned
+        offset:
+          type: integer
+          description: Number of records skipped
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code or type
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+    ValidationErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - validation_errors
+      properties:
+        error:
+          type: string
+          default: validation_error
+        message:
+          type: string
+          description: Human-readable error message
+        validation_errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Field name with validation error
+              message:
+                type: string
+                description: Validation error message
+

@@ -31,7 +31,25 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+**Domain-Driven Structure**: Does this feature belong to an existing domain, or does it require a new domain module? New domains MUST follow the structure: `src/[domain]/router.py`, `schemas.py`, `models.py`, `dependencies.py`, `service.py`, etc.
+
+**Async-First**: Are all I/O operations (DB, external APIs, file ops) async? CPU-intensive work MUST use thread pools.
+
+**Pydantic Models**: Are all API request/response models defined using Pydantic? Are `response_model`, `status_code`, `description`, `tags`, and `summary` specified for endpoints?
+
+**Dependency Injection**: Are shared resources (DB sessions, external clients, auth) injected via FastAPI dependencies? Are dependencies chained and reused?
+
+**SQL-First**: Are complex joins, aggregations, and JSON building done in SQL rather than Python? Database processing preferred over application-side manipulation.
+
+**Testing**: Will integration tests use async test clients (`httpx.AsyncClient`)? Test structure MUST mirror source domain structure.
+
+**Code Quality**: Will code pass ruff linting? Are pre-commit hooks configured?
+
+**Database Conventions**: Do new tables/columns follow naming conventions (lower_case_snake, singular tables, `_at` suffix for datetime)? Are migrations static and revertable?
+
+**RESTful Design**: Do endpoints follow REST conventions? Are HTTP methods and status codes appropriate?
+
+**External Services**: Are external API calls (OpenAI, etc.) abstracted in service layers? Are API keys in environment variables?
 
 ## Project Structure
 
@@ -56,39 +74,31 @@ specs/[###-feature]/
 -->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
+# FastAPI Backend Structure (Domain-Driven)
 src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+├── [domain]/
+│   ├── router.py      # FastAPI routes
+│   ├── schemas.py     # Pydantic models
+│   ├── models.py      # SQLAlchemy/SQLModel DB models
+│   ├── dependencies.py
+│   ├── config.py      # domain-specific configs
+│   ├── constants.py
+│   ├── exceptions.py
+│   ├── service.py
+│   └── utils.py
+├── config.py          # global configs
+├── models.py          # global models
+├── exceptions.py      # global exceptions
+├── database.py        # DB connection
+└── main.py
 
 tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+├── [domain]/          # Tests mirror source structure
+│   ├── test_router.py
+│   ├── test_service.py
+│   └── test_integration.py
+├── contract/          # API contract tests
+└── conftest.py        # pytest fixtures
 ```
 
 **Structure Decision**: [Document the selected structure and reference the real
