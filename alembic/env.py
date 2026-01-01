@@ -3,27 +3,29 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import MetaData, pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-
 from src.config import settings
-from src.database import engine
 
-# Alembic Config object
 config = context.config
 
-# Set database URL from settings
+if not settings.database_url:
+    raise ValueError(
+        "DATABASE_URL environment variable is required. "
+        "Set it in your .env file or environment variables."
+    )
+
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all models for autogenerate support
-from sqlalchemy import MetaData
+# Import models for autogenerate (must be after config setup)
+from src.audits.models import Audit  # noqa: E402, F401
 
 # Set naming convention for PostgreSQL
 POSTGRES_INDEXES_NAMING_CONVENTION = {
@@ -35,9 +37,6 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 }
 
 metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
-
-# Import models for autogenerate
-from src.audits.models import Audit  # noqa: E402
 
 # Set target metadata
 target_metadata = metadata

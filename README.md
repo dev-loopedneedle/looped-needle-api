@@ -40,11 +40,8 @@ FastAPI backend API for the Looped Needle project
 4. **Configure environment variables**:
    Create a `.env` file in the project root:
    ```env
-   POSTGRES_SERVER=localhost
-   POSTGRES_USER=postgres
-   POSTGRES_PASSWORD=your_password
-   POSTGRES_DB=looped_needle
-   DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER}/${POSTGRES_DB}
+   # Database Configuration (required)
+   DATABASE_URL=postgresql+asyncpg://postgres:your_password@localhost:5432/looped_needle
    
    ENVIRONMENT=local
    API_V1_PREFIX=/api/v1
@@ -186,12 +183,11 @@ All configuration is managed through environment variables. Create a `.env` file
 ### Required Variables
 
 **Database Configuration:**
-- `POSTGRES_SERVER` (default: `localhost`): PostgreSQL server hostname
-- `POSTGRES_USER` (default: `postgres`): PostgreSQL username
-- `POSTGRES_PASSWORD` (default: empty): PostgreSQL password
-- `POSTGRES_DB` (default: `looped_needle`): Database name
-- `DATABASE_URL` (optional): Full database connection URL. If not provided, will be constructed from individual POSTGRES_* variables.
-  - Format: `postgresql+asyncpg://user:password@host/dbname`
+- `DATABASE_URL` (required): Full database connection URL.
+  - Format: `postgresql+asyncpg://user:password@host:port/dbname`
+  - Example: `postgresql+asyncpg://postgres:password@localhost:5432/looped_needle`
+  - For Render: Use the Internal Database URL from your Render PostgreSQL service (change `postgresql://` to `postgresql+asyncpg://`)
+  - For local development: Use the External Database URL from Render or your local PostgreSQL connection string
 
 **API Configuration:**
 - `ENVIRONMENT` (default: `local`): Environment name (local, development, staging, production)
@@ -217,13 +213,8 @@ All configuration is managed through environment variables. Create a `.env` file
 ### Example `.env` File
 
 ```env
-# Database Configuration
-POSTGRES_SERVER=localhost
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=looped_needle
-# DATABASE_URL is optional - will be auto-constructed if not provided
-# DATABASE_URL=postgresql+asyncpg://postgres:password@localhost/looped_needle
+# Database Configuration (required)
+DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@localhost:5432/looped_needle
 
 # API Configuration
 ENVIRONMENT=local

@@ -10,10 +10,14 @@ from sqlalchemy.ext.asyncio import (
 
 from src.config import settings
 
-database_url = settings.database_url or settings.computed_database_url
+if not settings.database_url:
+    raise ValueError(
+        "DATABASE_URL environment variable is required. "
+        "Set it in your .env file or environment variables."
+    )
 
 engine = create_async_engine(
-    database_url,
+    settings.database_url,
     echo=False,
     pool_pre_ping=True,
     pool_size=10,
@@ -58,5 +62,10 @@ async def check_database_health() -> bool:
             await session.execute(text("SELECT 1"))
             await session.commit()
             return True
-    except Exception:
+    except Exception as e:
+        # Log the error for debugging (optional)
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Database health check failed: {e}")
         return False
