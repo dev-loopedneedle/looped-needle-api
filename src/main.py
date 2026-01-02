@@ -25,8 +25,6 @@ from src.audit_engine.exceptions import (
     SupplyChainNodeNotFoundError,
 )
 from src.audit_engine.router import router as audit_engine_router
-from src.audits.exceptions import AuditNotFoundError, AuditValidationError
-from src.audits.router import router as audits_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import BaseAPIException
@@ -142,42 +140,6 @@ async def base_api_exception_handler(request: Request, exc: BaseAPIException):
         content["request_id"] = request_id
     return JSONResponse(
         status_code=exc.status_code,
-        content=content,
-    )
-
-
-@app.exception_handler(AuditNotFoundError)
-async def audit_not_found_handler(request: Request, exc: AuditNotFoundError):
-    """Handle audit not found errors."""
-    request_id = getattr(request.state, "request_id", None)
-    content = {
-        "error": "AuditNotFound",
-        "message": exc.message,
-        "status_code": status.HTTP_404_NOT_FOUND,
-        "detail": "The requested audit record does not exist or has been deleted.",
-    }
-    if request_id:
-        content["request_id"] = request_id
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND,
-        content=content,
-    )
-
-
-@app.exception_handler(AuditValidationError)
-async def audit_validation_handler(request: Request, exc: AuditValidationError):
-    """Handle audit validation errors."""
-    request_id = getattr(request.state, "request_id", None)
-    content = {
-        "error": "AuditValidationError",
-        "message": exc.message,
-        "status_code": status.HTTP_400_BAD_REQUEST,
-        "detail": "The provided audit record data is invalid. Please check the request payload and try again.",
-    }
-    if request_id:
-        content["request_id"] = request_id
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
         content=content,
     )
 
@@ -381,7 +343,6 @@ async def internal_server_error_handler(request: Request, exc: Exception):
 
 # Register routers
 app.include_router(health_router)
-app.include_router(audits_router)
 app.include_router(audit_engine_router)
 
 

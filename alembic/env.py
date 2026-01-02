@@ -3,9 +3,10 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import MetaData, pool
+from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlmodel import SQLModel
 
 from alembic import context
 from src.config import settings
@@ -25,7 +26,16 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import models for autogenerate (must be after config setup)
-from src.audits.models import Audit  # noqa: E402, F401
+from src.audit_engine.models import (  # noqa: E402, F401
+    Brand,
+    Product,
+    SupplyChainNode,
+    SustainabilityCriterion,
+    CriteriaRule,
+    QuestionnaireDefinition,
+    AuditInstance,
+    AuditItem,
+)
 
 # Set naming convention for PostgreSQL
 POSTGRES_INDEXES_NAMING_CONVENTION = {
@@ -36,10 +46,9 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
     "pk": "%(table_name)s_pkey",
 }
 
-metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
-
-# Set target metadata
-target_metadata = metadata
+# Use SQLModel's metadata (models register themselves when imported above)
+SQLModel.metadata.naming_convention = POSTGRES_INDEXES_NAMING_CONVENTION
+target_metadata = SQLModel.metadata
 
 
 def run_migrations_offline() -> None:
