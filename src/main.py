@@ -17,6 +17,20 @@ from src.config import settings
 from src.database import engine
 from src.exceptions import BaseAPIException
 from src.health.router import router as health_router
+from src.inference.exceptions import (
+    AuditInstanceNotFoundError,
+    AuditItemNotFoundError,
+    BrandNotFoundError,
+    CriterionNotFoundError,
+    InferenceConflictError,
+    InferenceValidationError,
+    ProductNotFoundError,
+    QuestionnaireNotFoundError,
+    ReferentialIntegrityError,
+    RuleNotFoundError,
+    SupplyChainNodeNotFoundError,
+)
+from src.inference.router import router as inference_router
 
 
 # Configure structured JSON logging
@@ -51,7 +65,9 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         logger = logging.getLogger()
         old_factory = logger.makeRecord
 
-        def make_record_with_request_id(name, level, fn, lno, msg, args, exc_info, func=None, extra=None, sinfo=None):
+        def make_record_with_request_id(
+            name, level, fn, lno, msg, args, exc_info, func=None, extra=None, sinfo=None
+        ):
             rv = old_factory(name, level, fn, lno, msg, args, exc_info, func, extra, sinfo)
             rv.request_id = request_id
             return rv
@@ -69,7 +85,9 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 # Setup logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
-    format="%(message)s" if settings.log_format == "json" else "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(message)s"
+    if settings.log_format == "json"
+    else "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 if settings.log_format == "json":
     handler = logging.StreamHandler()
@@ -164,6 +182,165 @@ async def audit_validation_handler(request: Request, exc: AuditValidationError):
     )
 
 
+@app.exception_handler(ReferentialIntegrityError)
+async def referential_integrity_handler(request: Request, exc: ReferentialIntegrityError):
+    """Handle referential integrity errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "ReferentialIntegrityError",
+        "message": exc.message,
+        "status_code": status.HTTP_409_CONFLICT,
+        "detail": "Cannot delete this entity because it is referenced by other entities.",
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=content,
+    )
+
+
+# Inference domain exception handlers
+@app.exception_handler(BrandNotFoundError)
+async def brand_not_found_handler(request: Request, exc: BrandNotFoundError):
+    """Handle brand not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "BrandNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(ProductNotFoundError)
+async def product_not_found_handler(request: Request, exc: ProductNotFoundError):
+    """Handle product not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "ProductNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(SupplyChainNodeNotFoundError)
+async def supply_chain_node_not_found_handler(request: Request, exc: SupplyChainNodeNotFoundError):
+    """Handle supply chain node not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "SupplyChainNodeNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(CriterionNotFoundError)
+async def criterion_not_found_handler(request: Request, exc: CriterionNotFoundError):
+    """Handle criterion not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "CriterionNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(RuleNotFoundError)
+async def rule_not_found_handler(request: Request, exc: RuleNotFoundError):
+    """Handle rule not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "RuleNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(QuestionnaireNotFoundError)
+async def questionnaire_not_found_handler(request: Request, exc: QuestionnaireNotFoundError):
+    """Handle questionnaire not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "QuestionnaireNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(AuditInstanceNotFoundError)
+async def audit_instance_not_found_handler(request: Request, exc: AuditInstanceNotFoundError):
+    """Handle audit instance not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "AuditInstanceNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(AuditItemNotFoundError)
+async def audit_item_not_found_handler(request: Request, exc: AuditItemNotFoundError):
+    """Handle audit item not found errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "AuditItemNotFound",
+        "message": exc.message,
+        "status_code": status.HTTP_404_NOT_FOUND,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=content)
+
+
+@app.exception_handler(InferenceValidationError)
+async def inference_validation_handler(request: Request, exc: InferenceValidationError):
+    """Handle inference validation errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "InferenceValidationError",
+        "message": exc.message,
+        "status_code": status.HTTP_400_BAD_REQUEST,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=content)
+
+
+@app.exception_handler(InferenceConflictError)
+async def inference_conflict_handler(request: Request, exc: InferenceConflictError):
+    """Handle inference conflict errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "InferenceConflictError",
+        "message": exc.message,
+        "status_code": status.HTTP_409_CONFLICT,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=content)
+
+
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc: Exception):
     """Handle 404 errors."""
@@ -205,6 +382,8 @@ async def internal_server_error_handler(request: Request, exc: Exception):
 # Register routers
 app.include_router(health_router)
 app.include_router(audits_router)
+app.include_router(inference_router)
+
 
 # Root endpoint
 @app.get(
@@ -221,4 +400,3 @@ async def root():
         "health": "/health",
         "api_prefix": settings.api_v1_prefix,
     }
-

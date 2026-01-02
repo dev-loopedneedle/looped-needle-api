@@ -93,4 +93,3 @@ async def database_health_check(request: Request) -> HealthResponse:
             ).model_dump(),
         },
     )
-

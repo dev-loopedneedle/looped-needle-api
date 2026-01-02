@@ -1,0 +1,263 @@
+openapi: 3.1.0
+info:
+  title: Audit Instances API
+  description: API endpoints for audit instance management and item generation
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: audit-instances
+    description: Audit instance operations
+
+paths:
+  /audit-instances:
+    get:
+      summary: List audit instances
+      description: Retrieve a paginated list of audit instances
+      operationId: listAuditInstances
+      tags:
+        - audit-instances
+      parameters:
+        - name: brand_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [IN_PROGRESS, REVIEWING, CERTIFIED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditInstanceListResponse'
+    post:
+      summary: Create audit instance
+      description: Create a new audit instance with questionnaire responses
+      operationId: createAuditInstance
+      tags:
+        - audit-instances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditInstanceCreate'
+      responses:
+        '201':
+          description: Audit instance created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditInstanceResponse'
+
+  /audit-instances/{audit_instance_id}:
+    get:
+      summary: Get audit instance
+      description: Retrieve a specific audit instance by ID
+      operationId: getAuditInstance
+      tags:
+        - audit-instances
+      parameters:
+        - name: audit_instance_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditInstanceResponse'
+    put:
+      summary: Update audit instance
+      description: Update audit instance status (forward-only transitions)
+      operationId: updateAuditInstance
+      tags:
+        - audit-instances
+      parameters:
+        - name: audit_instance_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditInstanceUpdate'
+      responses:
+        '200':
+          description: Audit instance updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditInstanceResponse'
+        '400':
+          description: Invalid status transition
+
+  /audit-instances/{audit_instance_id}/generate-items:
+    post:
+      summary: Generate audit items
+      description: Trigger audit item generation by evaluating rules against brand context and questionnaire responses
+      operationId: generateAuditItems
+      tags:
+        - audit-instances
+      parameters:
+        - name: audit_instance_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audit items generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditItemGenerationResponse'
+        '404':
+          description: Audit instance not found
+
+components:
+  schemas:
+    AuditInstanceCreate:
+      type: object
+      required:
+        - brand_id
+        - questionnaire_definition_id
+        - scoping_responses
+      properties:
+        brand_id:
+          type: string
+          format: uuid
+        questionnaire_definition_id:
+          type: string
+          format: uuid
+        scoping_responses:
+          type: object
+          additionalProperties: true
+          description: Questionnaire responses as JSON object
+
+    AuditInstanceUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [IN_PROGRESS, REVIEWING, CERTIFIED]
+        overall_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+
+    AuditInstanceResponse:
+      type: object
+      required:
+        - id
+        - brand_id
+        - questionnaire_definition_id
+        - status
+        - scoping_responses
+        - brand_context_snapshot
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        brand_id:
+          type: string
+          format: uuid
+        questionnaire_definition_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [IN_PROGRESS, REVIEWING, CERTIFIED]
+        scoping_responses:
+          type: object
+          additionalProperties: true
+        brand_context_snapshot:
+          type: object
+          additionalProperties: true
+        overall_score:
+          type: number
+          format: float
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AuditInstanceListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditInstanceResponse'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    AuditItemGenerationResponse:
+      type: object
+      required:
+        - audit_instance_id
+        - items_created
+        - items_preserved
+        - rules_evaluated
+        - rules_failed
+      properties:
+        audit_instance_id:
+          type: string
+          format: uuid
+        items_created:
+          type: integer
+          description: Number of new audit items created
+        items_preserved:
+          type: integer
+          description: Number of existing items preserved (with evidence)
+        rules_evaluated:
+          type: integer
+          description: Total number of rules evaluated
+        rules_failed:
+          type: integer
+          description: Number of rules that failed evaluation
+

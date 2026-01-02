@@ -1,0 +1,139 @@
+openapi: 3.1.0
+info:
+  title: Audit Items API
+  description: API endpoints for audit item management
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: audit-items
+    description: Audit item operations
+
+paths:
+  /audit-instances/{audit_instance_id}/items:
+    get:
+      summary: List audit items
+      operationId: listAuditItems
+      tags: [audit-items]
+      parameters:
+        - name: audit_instance_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [MISSING_EVIDENCE, EVIDENCE_PROVIDED, UNDER_REVIEW, ACCEPTED, REJECTED]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditItemListResponse'
+
+  /audit-items/{audit_item_id}:
+    get:
+      summary: Get audit item
+      operationId: getAuditItem
+      tags: [audit-items]
+      parameters:
+        - name: audit_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditItemResponse'
+    put:
+      summary: Update audit item
+      operationId: updateAuditItem
+      tags: [audit-items]
+      parameters:
+        - name: audit_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditItemUpdate'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditItemResponse'
+        '400':
+          description: Invalid status transition
+
+components:
+  schemas:
+    AuditItemUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [MISSING_EVIDENCE, EVIDENCE_PROVIDED, UNDER_REVIEW, ACCEPTED, REJECTED]
+        auditor_comments:
+          type: string
+
+    AuditItemResponse:
+      type: object
+      required:
+        - id
+        - audit_instance_id
+        - criteria_id
+        - triggered_by_rule_id
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        audit_instance_id:
+          type: string
+          format: uuid
+        criteria_id:
+          type: string
+          format: uuid
+        triggered_by_rule_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [MISSING_EVIDENCE, EVIDENCE_PROVIDED, UNDER_REVIEW, ACCEPTED, REJECTED]
+        auditor_comments:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AuditItemListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditItemResponse'
+        total:
+          type: integer
+

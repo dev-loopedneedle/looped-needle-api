@@ -1,0 +1,162 @@
+openapi: 3.1.0
+info:
+  title: Criteria Rules API
+  description: API endpoints for criteria rule management
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: rules
+    description: Criteria rule operations
+
+paths:
+  /criteria/{criterion_id}/rules:
+    get:
+      summary: List rules for criterion
+      operationId: listRules
+      tags: [rules]
+      parameters:
+        - name: criterion_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleListResponse'
+    post:
+      summary: Create rule
+      operationId: createRule
+      tags: [rules]
+      parameters:
+        - name: criterion_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleCreate'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+
+  /rules/{rule_id}:
+    get:
+      summary: Get rule
+      operationId: getRule
+      tags: [rules]
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+    put:
+      summary: Update rule
+      operationId: updateRule
+      tags: [rules]
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleUpdate'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+
+components:
+  schemas:
+    RuleCreate:
+      type: object
+      required:
+        - rule_name
+        - condition_expression
+        - priority
+      properties:
+        rule_name:
+          type: string
+        condition_expression:
+          type: string
+          description: Python-like expression string
+        priority:
+          type: integer
+          default: 0
+
+    RuleUpdate:
+      type: object
+      properties:
+        rule_name:
+          type: string
+        condition_expression:
+          type: string
+        priority:
+          type: integer
+
+    RuleResponse:
+      type: object
+      required:
+        - id
+        - criteria_id
+        - rule_name
+        - condition_expression
+        - priority
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        criteria_id:
+          type: string
+          format: uuid
+        rule_name:
+          type: string
+        condition_expression:
+          type: string
+        priority:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    RuleListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleResponse'
+        total:
+          type: integer
+
