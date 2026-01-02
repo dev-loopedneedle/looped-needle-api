@@ -47,8 +47,9 @@ class AuditInstanceService:
         # Verify brand exists
         brand = await BrandService.get_brand(db, audit_data.brand_id)
 
-        # Verify questionnaire exists
-        await QuestionnaireService.get_questionnaire(db, audit_data.questionnaire_definition_id)
+        # Verify questionnaire exists if provided
+        if audit_data.questionnaire_definition_id:
+            await QuestionnaireService.get_questionnaire(db, audit_data.questionnaire_definition_id)
 
         # Capture brand context snapshot
         products = await ProductService.get_products_by_brand(db, audit_data.brand_id)

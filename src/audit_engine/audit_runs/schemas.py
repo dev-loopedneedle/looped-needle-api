@@ -1,7 +1,7 @@
 """Schemas for audit runs (instances and items)."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -13,15 +13,15 @@ class AuditInstanceCreate(BaseModel):
     """Schema for creating an audit instance."""
 
     brand_id: UUID = Field(..., description="Brand ID")
-    questionnaire_definition_id: UUID = Field(..., description="Questionnaire definition ID")
+    questionnaire_definition_id: Optional[UUID] = Field(None, description="Questionnaire definition ID (optional)")
     scoping_responses: dict[str, Any] = Field(..., description="Questionnaire answers")
 
 
 class AuditInstanceUpdate(BaseModel):
     """Schema for updating an audit instance."""
 
-    status: AuditInstanceStatus | None = Field(None, description="Audit status")
-    overall_score: float | None = Field(None, ge=0, le=100, description="Overall audit score")
+    status: Optional[AuditInstanceStatus] = Field(None, description="Audit status")
+    overall_score: Optional[float] = Field(None, ge=0, le=100, description="Overall audit score")
 
 
 class AuditInstanceResponse(BaseModel):
@@ -29,13 +29,13 @@ class AuditInstanceResponse(BaseModel):
 
     id: UUID
     brand_id: UUID
-    questionnaire_definition_id: UUID
+    questionnaire_definition_id: Optional[UUID] = Field(None, description="Questionnaire definition ID")
     status: AuditInstanceStatus
     scoping_responses: dict[str, Any]
     brand_context_snapshot: dict[str, Any]
-    overall_score: float | None
+    overall_score: Optional[float] = Field(None, description="Overall audit score (0-100)")
     created_at: datetime
-    updated_at: datetime | None
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
     model_config = {"from_attributes": True}
 
@@ -43,8 +43,8 @@ class AuditInstanceResponse(BaseModel):
 class AuditInstanceListQuery(BaseModel):
     """Schema for audit instance list query parameters."""
 
-    brand_id: UUID | None = Field(None, description="Filter by brand ID")
-    status: AuditInstanceStatus | None = Field(None, description="Filter by status")
+    brand_id: Optional[UUID] = Field(None, description="Filter by brand ID")
+    status: Optional[AuditInstanceStatus] = Field(None, description="Filter by status")
     limit: int = Field(
         default=20, ge=1, le=MAX_PAGE_LIMIT, description="Maximum number of records to return"
     )
@@ -68,9 +68,9 @@ class AuditItemResponse(BaseModel):
     criteria_id: UUID
     triggered_by_rule_id: UUID
     status: AuditItemStatus
-    auditor_comments: str | None
+    auditor_comments: Optional[str] = Field(None, description="Auditor comments")
     created_at: datetime
-    updated_at: datetime | None
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
     model_config = {"from_attributes": True}
 
@@ -78,8 +78,8 @@ class AuditItemResponse(BaseModel):
 class AuditItemUpdate(BaseModel):
     """Schema for updating an audit item."""
 
-    status: AuditItemStatus | None = Field(None, description="Audit item status")
-    auditor_comments: str | None = Field(None, description="Auditor comments")
+    status: Optional[AuditItemStatus] = Field(None, description="Audit item status")
+    auditor_comments: Optional[str] = Field(None, description="Auditor comments")
 
 
 class AuditItemListResponse(BaseModel):

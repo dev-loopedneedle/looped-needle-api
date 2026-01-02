@@ -28,7 +28,7 @@ class Brand(SQLModel, table=True):
     )
     name: str = Field(max_length=255, index=True)
     registration_country: str
-    company_size: CompanySize
+    company_size: CompanySize = Field(sa_column=Column(String, nullable=False))
     target_markets: list[str] = Field(default_factory=list, sa_column=Column(ARRAY(String)))
     deleted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), index=True)
@@ -150,7 +150,7 @@ class SustainabilityCriterion(SQLModel, table=True):
     code: str = Field(unique=True, index=True)
     name: str
     description: str
-    domain: SustainabilityDomain
+    domain: SustainabilityDomain = Field(sa_column=Column(String, nullable=False))
     deleted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), index=True)
     )
@@ -263,14 +263,18 @@ class AuditInstance(SQLModel, table=True):
             PostgresUUID(as_uuid=True), ForeignKey("brands.id", ondelete="RESTRICT"), nullable=False
         )
     )
-    questionnaire_definition_id: UUID = Field(
+    questionnaire_definition_id: UUID | None = Field(
+        default=None,
         sa_column=Column(
             PostgresUUID(as_uuid=True),
             ForeignKey("questionnaire_definitions.id", ondelete="RESTRICT"),
-            nullable=False,
+            nullable=True,
         )
     )
-    status: AuditInstanceStatus = Field(default=AuditInstanceStatus.IN_PROGRESS, index=True)
+    status: AuditInstanceStatus = Field(
+        default=AuditInstanceStatus.IN_PROGRESS,
+        sa_column=Column(String, nullable=False, server_default="IN_PROGRESS", index=True),
+    )
     scoping_responses: dict[str, Any] = Field(
         default_factory=dict, sa_column=Column(JSONB, nullable=False)
     )
@@ -345,7 +349,10 @@ class AuditItem(SQLModel, table=True):
             nullable=False,
         )
     )
-    status: AuditItemStatus = Field(default=AuditItemStatus.MISSING_EVIDENCE, index=True)
+    status: AuditItemStatus = Field(
+        default=AuditItemStatus.MISSING_EVIDENCE,
+        sa_column=Column(String, nullable=False, server_default="MISSING_EVIDENCE", index=True),
+    )
     auditor_comments: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     deleted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), index=True)

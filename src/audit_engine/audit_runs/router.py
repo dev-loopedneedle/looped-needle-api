@@ -46,7 +46,7 @@ async def create_audit_instance(
     """Create a new audit instance."""
     request_id = _get_request_id(request)
     logger.info(
-        f"Creating audit instance: brand_id={audit_data.brand_id}",
+        f"Creating audit instance: brand_id={audit_data.brand_id}, questionnaire_id={audit_data.questionnaire_definition_id}",
         extra={"request_id": request_id},
     )
     audit_instance = await AuditInstanceService.create_audit_instance(db, audit_data)
