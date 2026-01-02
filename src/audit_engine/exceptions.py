@@ -85,14 +85,14 @@ class ReferentialIntegrityError(ValidationError):
 
 
 class InferenceValidationError(ValidationError):
-    """Inference validation error exception."""
+    """Audit engine validation error exception."""
 
-    def __init__(self, message: str = "Invalid inference data"):
+    def __init__(self, message: str = "Invalid audit engine data"):
         super().__init__(message)
 
 
 class InferenceConflictError(ValidationError):
-    """Inference conflict error exception."""
+    """Audit engine conflict error exception."""
 
-    def __init__(self, message: str = "Inference conflict error"):
+    def __init__(self, message: str = "Audit engine conflict error"):
         super().__init__(message)

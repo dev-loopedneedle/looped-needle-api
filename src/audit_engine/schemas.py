@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.inference.constants import (
+from src.audit_engine.constants import (
     MAX_PAGE_LIMIT,
     AuditInstanceStatus,
     AuditItemStatus,

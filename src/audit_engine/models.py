@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlmodel import Field, SQLModel
 
-from src.inference.constants import (
+from src.audit_engine.constants import (
     AuditInstanceStatus,
     AuditItemStatus,
     CompanySize,

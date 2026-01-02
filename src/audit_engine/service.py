@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.inference.exceptions import (
+from src.audit_engine.exceptions import (
     AuditInstanceNotFoundError,
     AuditItemNotFoundError,
     BrandNotFoundError,
@@ -17,8 +17,8 @@ from src.inference.exceptions import (
     ReferentialIntegrityError,
     RuleNotFoundError,
 )
-from src.inference.expression_evaluator import ExpressionEvaluator
-from src.inference.models import (
+from src.audit_engine.expression_evaluator import ExpressionEvaluator
+from src.audit_engine.models import (
     AuditInstance,
     AuditItem,
     Brand,
@@ -28,7 +28,7 @@ from src.inference.models import (
     SupplyChainNode,
     SustainabilityCriterion,
 )
-from src.inference.schemas import (
+from src.audit_engine.schemas import (
     AuditInstanceCreate,
     AuditInstanceListQuery,
     AuditInstanceUpdate,
@@ -45,7 +45,7 @@ from src.inference.schemas import (
     RuleUpdate,
     SupplyChainNodeCreate,
 )
-from src.inference.utils import check_brand_references
+from src.audit_engine.utils import check_brand_references
 
 
 class BrandService:
@@ -833,7 +833,7 @@ class AuditInstanceService:
         Raises:
             AuditInstanceNotFoundError: If audit instance not found
         """
-        from src.inference.utils import validate_audit_instance_status_transition
+        from src.audit_engine.utils import validate_audit_instance_status_transition
 
         audit_instance = await AuditInstanceService.get_audit_instance(db, audit_instance_id)
 
@@ -1067,7 +1067,7 @@ class AuditItemService:
         Raises:
             AuditItemNotFoundError: If audit item not found
         """
-        from src.inference.utils import can_transition_audit_item
+        from src.audit_engine.utils import can_transition_audit_item
 
         audit_item = await AuditItemService.get_audit_item(db, audit_item_id)
 
@@ -1076,7 +1076,7 @@ class AuditItemService:
             # Validate status transition if status is being updated
             if "status" in update_dict:
                 if not can_transition_audit_item(audit_item.status, update_dict["status"]):
-                    from src.inference.exceptions import InferenceValidationError
+                    from src.audit_engine.exceptions import InferenceValidationError
 
                     raise InferenceValidationError(
                         f"Invalid status transition from {audit_item.status} to {update_dict['status']}"

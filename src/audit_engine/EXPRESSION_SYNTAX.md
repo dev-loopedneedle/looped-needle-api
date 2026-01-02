@@ -2,7 +2,7 @@
 
 ## Overview
 
-The inference engine uses a custom `ExpressionEvaluator` that supports Python-like expressions with helper functions for common operations.
+The audit engine uses a custom `ExpressionEvaluator` that supports Python-like expressions with helper functions for common operations.
 
 ## Basic Syntax
 

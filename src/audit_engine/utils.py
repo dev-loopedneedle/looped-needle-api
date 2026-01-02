@@ -3,8 +3,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.inference.constants import AuditInstanceStatus, AuditItemStatus
-from src.inference.exceptions import InferenceValidationError
+from src.audit_engine.constants import AuditInstanceStatus, AuditItemStatus
+from src.audit_engine.exceptions import InferenceValidationError
 
 
 async def check_brand_references(session: AsyncSession, brand_id: str) -> tuple[bool, str | None]:
@@ -18,7 +18,7 @@ async def check_brand_references(session: AsyncSession, brand_id: str) -> tuple[
     Returns:
         Tuple of (is_referenced, reference_type)
     """
-    from src.inference.models import AuditInstance
+    from src.audit_engine.models import AuditInstance
 
     result = await session.execute(
         select(AuditInstance).where(
@@ -43,7 +43,7 @@ async def check_criterion_references(
     Returns:
         Tuple of (is_referenced, reference_type)
     """
-    from src.inference.models import AuditItem
+    from src.audit_engine.models import AuditItem
 
     result = await session.execute(
         select(AuditItem).where(
@@ -66,7 +66,7 @@ async def check_rule_references(session: AsyncSession, rule_id: str) -> tuple[bo
     Returns:
         Tuple of (is_referenced, reference_type)
     """
-    from src.inference.models import AuditItem
+    from src.audit_engine.models import AuditItem
 
     result = await session.execute(
         select(AuditItem).where(

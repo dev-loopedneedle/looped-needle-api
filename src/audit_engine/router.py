@@ -1,4 +1,4 @@
-"""Inference engine domain router."""
+"""Audit engine domain router."""
 
 import logging
 from uuid import UUID
@@ -6,8 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.inference.dependencies import get_inference_db
-from src.inference.schemas import (
+from src.audit_engine.dependencies import get_audit_engine_db
+from src.audit_engine.schemas import (
     AuditInstanceCreate,
     AuditInstanceListQuery,
     AuditInstanceListResponse,
@@ -39,7 +39,7 @@ from src.inference.schemas import (
     SupplyChainNodeCreate,
     SupplyChainNodeResponse,
 )
-from src.inference.service import (
+from src.audit_engine.service import (
     AuditInstanceService,
     AuditItemService,
     BrandService,
@@ -50,7 +50,7 @@ from src.inference.service import (
     SupplyChainNodeService,
 )
 
-router = APIRouter(prefix="/api/v1", tags=["inference"])
+router = APIRouter(prefix="/api/v1", tags=["audit-engine"])
 logger = logging.getLogger(__name__)
 
 
@@ -70,7 +70,7 @@ def _get_request_id(request: Request) -> str | None:
 async def create_brand(
     request: Request,
     brand_data: BrandCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandResponse:
     """Create a new brand."""
     request_id = _get_request_id(request)
@@ -89,7 +89,7 @@ async def list_brands(
     request: Request,
     limit: int = Query(default=20, ge=1, le=50, description="Maximum number of records to return"),
     offset: int = Query(default=0, ge=0, description="Number of records to skip"),
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandListResponse:
     """List brands with pagination."""
     request_id = _get_request_id(request)
@@ -113,7 +113,7 @@ async def list_brands(
 async def get_brand(
     request: Request,
     brand_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandResponse:
     """Get brand by ID."""
     request_id = _get_request_id(request)
@@ -132,7 +132,7 @@ async def update_brand(
     request: Request,
     brand_id: UUID,
     brand_data: BrandUpdate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandResponse:
     """Update brand."""
     request_id = _get_request_id(request)
@@ -150,7 +150,7 @@ async def update_brand(
 async def delete_brand(
     request: Request,
     brand_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> None:
     """Delete brand (soft delete)."""
     request_id = _get_request_id(request)
@@ -170,7 +170,7 @@ async def create_product(
     request: Request,
     brand_id: UUID,
     product_data: ProductCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> ProductResponse:
     """Create a new product."""
     request_id = _get_request_id(request)
@@ -190,7 +190,7 @@ async def create_product(
 async def list_products(
     request: Request,
     brand_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> list[ProductResponse]:
     """List products for a brand."""
     request_id = _get_request_id(request)
@@ -213,7 +213,7 @@ async def create_supply_chain_node(
     request: Request,
     brand_id: UUID,
     node_data: SupplyChainNodeCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> SupplyChainNodeResponse:
     """Create a new supply chain node."""
     request_id = _get_request_id(request)
@@ -234,7 +234,7 @@ async def create_supply_chain_node(
 async def list_supply_chain_nodes(
     request: Request,
     brand_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> list[SupplyChainNodeResponse]:
     """List supply chain nodes for a brand."""
     request_id = _get_request_id(request)
@@ -257,7 +257,7 @@ async def list_supply_chain_nodes(
 async def create_criterion(
     request: Request,
     criterion_data: CriterionCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> CriterionResponse:
     """Create a new sustainability criterion."""
     request_id = _get_request_id(request)
@@ -279,7 +279,7 @@ async def list_criteria(
     ),
     limit: int = Query(default=20, ge=1, le=50, description="Maximum number of records to return"),
     offset: int = Query(default=0, ge=0, description="Number of records to skip"),
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> CriterionListResponse:
     """List criteria with pagination."""
     request_id = _get_request_id(request)
@@ -287,7 +287,7 @@ async def list_criteria(
         f"Listing criteria: domain={domain}, limit={limit}, offset={offset}",
         extra={"request_id": request_id},
     )
-    from src.inference.constants import SustainabilityDomain
+    from src.audit_engine.constants import SustainabilityDomain
 
     query = CriterionListQuery(
         domain=SustainabilityDomain(domain) if domain else None,
@@ -312,7 +312,7 @@ async def list_criteria(
 async def get_criterion(
     request: Request,
     criterion_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> CriterionResponse:
     """Get criterion by ID."""
     request_id = _get_request_id(request)
@@ -333,7 +333,7 @@ async def create_rule(
     request: Request,
     criterion_id: UUID,
     rule_data: RuleCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> RuleResponse:
     """Create a new rule for a criterion."""
     request_id = _get_request_id(request)
@@ -354,7 +354,7 @@ async def create_rule(
 async def list_rules(
     request: Request,
     criterion_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> RuleListResponse:
     """List rules for a criterion."""
     request_id = _get_request_id(request)
@@ -378,7 +378,7 @@ async def list_rules(
 async def get_rule(
     request: Request,
     rule_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> RuleResponse:
     """Get rule by ID."""
     request_id = _get_request_id(request)
@@ -397,7 +397,7 @@ async def update_rule(
     request: Request,
     rule_id: UUID,
     rule_data: RuleUpdate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> RuleResponse:
     """Update rule."""
     request_id = _get_request_id(request)
@@ -417,7 +417,7 @@ async def update_rule(
 async def create_questionnaire(
     request: Request,
     questionnaire_data: QuestionnaireDefinitionCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> QuestionnaireDefinitionResponse:
     """Create a new questionnaire definition."""
     request_id = _get_request_id(request)
@@ -439,7 +439,7 @@ async def list_questionnaires(
     is_active: bool | None = Query(None, description="Filter by active status"),
     limit: int = Query(default=20, ge=1, le=50, description="Maximum number of records to return"),
     offset: int = Query(default=0, ge=0, description="Number of records to skip"),
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> QuestionnaireListResponse:
     """List questionnaires with pagination."""
     request_id = _get_request_id(request)
@@ -466,7 +466,7 @@ async def list_questionnaires(
 async def get_questionnaire(
     request: Request,
     questionnaire_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> QuestionnaireDefinitionResponse:
     """Get questionnaire by ID."""
     request_id = _get_request_id(request)
@@ -486,7 +486,7 @@ async def get_questionnaire(
 async def create_audit_instance(
     request: Request,
     audit_data: AuditInstanceCreate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceResponse:
     """Create a new audit instance."""
     request_id = _get_request_id(request)
@@ -510,7 +510,7 @@ async def list_audit_instances(
     status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(default=20, ge=1, le=50, description="Maximum number of records to return"),
     offset: int = Query(default=0, ge=0, description="Number of records to skip"),
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceListResponse:
     """List audit instances with pagination."""
     request_id = _get_request_id(request)
@@ -518,7 +518,7 @@ async def list_audit_instances(
         f"Listing audit instances: brand_id={brand_id}, status={status}, limit={limit}, offset={offset}",
         extra={"request_id": request_id},
     )
-    from src.inference.constants import AuditInstanceStatus
+    from src.audit_engine.constants import AuditInstanceStatus
 
     query = AuditInstanceListQuery(
         brand_id=brand_id,
@@ -544,7 +544,7 @@ async def list_audit_instances(
 async def get_audit_instance(
     request: Request,
     audit_instance_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceResponse:
     """Get audit instance by ID."""
     request_id = _get_request_id(request)
@@ -563,7 +563,7 @@ async def update_audit_instance(
     request: Request,
     audit_instance_id: UUID,
     audit_data: AuditInstanceUpdate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceResponse:
     """Update audit instance."""
     request_id = _get_request_id(request)
@@ -587,7 +587,7 @@ async def update_audit_instance(
 async def generate_audit_items(
     request: Request,
     audit_instance_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemGenerationResponse:
     """Generate audit items for an audit instance."""
     request_id = _get_request_id(request)
@@ -615,7 +615,7 @@ async def generate_audit_items(
 async def list_audit_items(
     request: Request,
     audit_instance_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemListResponse:
     """List audit items for an audit instance."""
     request_id = _get_request_id(request)
@@ -640,7 +640,7 @@ async def list_audit_items(
 async def get_audit_item(
     request: Request,
     audit_item_id: UUID,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemResponse:
     """Get audit item by ID."""
     request_id = _get_request_id(request)
@@ -660,7 +660,7 @@ async def update_audit_item(
     request: Request,
     audit_item_id: UUID,
     audit_item_data: AuditItemUpdate,
-    db: AsyncSession = Depends(get_inference_db),
+    db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemResponse:
     """Update audit item."""
     request_id = _get_request_id(request)

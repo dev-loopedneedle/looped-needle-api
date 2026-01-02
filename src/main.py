@@ -11,13 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.audits.exceptions import AuditNotFoundError, AuditValidationError
-from src.audits.router import router as audits_router
-from src.config import settings
-from src.database import engine
-from src.exceptions import BaseAPIException
-from src.health.router import router as health_router
-from src.inference.exceptions import (
+from src.audit_engine.exceptions import (
     AuditInstanceNotFoundError,
     AuditItemNotFoundError,
     BrandNotFoundError,
@@ -30,7 +24,13 @@ from src.inference.exceptions import (
     RuleNotFoundError,
     SupplyChainNodeNotFoundError,
 )
-from src.inference.router import router as inference_router
+from src.audit_engine.router import router as audit_engine_router
+from src.audits.exceptions import AuditNotFoundError, AuditValidationError
+from src.audits.router import router as audits_router
+from src.config import settings
+from src.database import engine
+from src.exceptions import BaseAPIException
+from src.health.router import router as health_router
 
 
 # Configure structured JSON logging
@@ -314,8 +314,8 @@ async def audit_item_not_found_handler(request: Request, exc: AuditItemNotFoundE
 
 
 @app.exception_handler(InferenceValidationError)
-async def inference_validation_handler(request: Request, exc: InferenceValidationError):
-    """Handle inference validation errors."""
+async def audit_engine_validation_handler(request: Request, exc: InferenceValidationError):
+    """Handle audit engine validation errors."""
     request_id = getattr(request.state, "request_id", None)
     content = {
         "error": "InferenceValidationError",
@@ -328,8 +328,8 @@ async def inference_validation_handler(request: Request, exc: InferenceValidatio
 
 
 @app.exception_handler(InferenceConflictError)
-async def inference_conflict_handler(request: Request, exc: InferenceConflictError):
-    """Handle inference conflict errors."""
+async def audit_engine_conflict_handler(request: Request, exc: InferenceConflictError):
+    """Handle audit engine conflict errors."""
     request_id = getattr(request.state, "request_id", None)
     content = {
         "error": "InferenceConflictError",
@@ -382,7 +382,7 @@ async def internal_server_error_handler(request: Request, exc: Exception):
 # Register routers
 app.include_router(health_router)
 app.include_router(audits_router)
-app.include_router(inference_router)
+app.include_router(audit_engine_router)
 
 
 # Root endpoint
