@@ -25,6 +25,8 @@ from src.audit_engine.exceptions import (
     SupplyChainNodeNotFoundError,
 )
 from src.audit_engine.router import router as audit_engine_router
+from src.auth.exceptions import AccessDeniedError, AuthenticationError, ServiceUnavailableError
+from src.auth.router import router as auth_router
 from src.config import settings
 from src.database import engine
 from src.exceptions import BaseAPIException
@@ -303,6 +305,49 @@ async def audit_engine_conflict_handler(request: Request, exc: InferenceConflict
     return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=content)
 
 
+# Auth domain exception handlers
+@app.exception_handler(AuthenticationError)
+async def authentication_error_handler(request: Request, exc: AuthenticationError):
+    """Handle authentication errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "AuthenticationError",
+        "message": exc.message,
+        "status_code": status.HTTP_401_UNAUTHORIZED,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content=content)
+
+
+@app.exception_handler(ServiceUnavailableError)
+async def service_unavailable_handler(request: Request, exc: ServiceUnavailableError):
+    """Handle service unavailable errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "ServiceUnavailable",
+        "message": exc.message,
+        "status_code": status.HTTP_503_SERVICE_UNAVAILABLE,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=content)
+
+
+@app.exception_handler(AccessDeniedError)
+async def access_denied_handler(request: Request, exc: AccessDeniedError):
+    """Handle access denied errors."""
+    request_id = getattr(request.state, "request_id", None)
+    content = {
+        "error": "AccessDenied",
+        "message": exc.message,
+        "status_code": status.HTTP_403_FORBIDDEN,
+    }
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content=content)
+
+
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc: Exception):
     """Handle 404 errors."""
@@ -343,6 +388,7 @@ async def internal_server_error_handler(request: Request, exc: Exception):
 
 # Register routers
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(audit_engine_router)
 
 

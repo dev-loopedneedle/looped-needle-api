@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from src.audit_engine.constants import CompanySize, MAX_PAGE_LIMIT
+from src.audit_engine.constants import MAX_PAGE_LIMIT, CompanySize
 
 
 class BrandCreate(BaseModel):

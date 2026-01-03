@@ -27,15 +27,16 @@ if config.config_file_name is not None:
 
 # Import models for autogenerate (must be after config setup)
 from src.audit_engine.models import (  # noqa: E402, F401
-    Brand,
-    Product,
-    SupplyChainNode,
-    SustainabilityCriterion,
-    CriteriaRule,
-    QuestionnaireDefinition,
     AuditInstance,
     AuditItem,
+    Brand,
+    CriteriaRule,
+    Product,
+    QuestionnaireDefinition,
+    SupplyChainNode,
+    SustainabilityCriterion,
 )
+from src.auth.models import UserProfile  # noqa: E402, F401
 
 # Set naming convention for PostgreSQL
 POSTGRES_INDEXES_NAMING_CONVENTION = {

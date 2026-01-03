@@ -16,6 +16,8 @@ from src.audit_engine.brands.schemas import (
 from src.audit_engine.exceptions import BrandNotFoundError, ReferentialIntegrityError
 from src.audit_engine.models import Brand, Product, SupplyChainNode
 from src.audit_engine.utils import check_brand_references
+from src.auth.dependencies import UserContext
+from src.auth.exceptions import AccessDeniedError
 
 
 class BrandService:
@@ -25,6 +27,7 @@ class BrandService:
     async def create_brand(
         db: AsyncSession,
         brand_data: BrandCreate,
+        current_user: UserContext,
     ) -> Brand:
         """
         Create a new brand.
@@ -36,7 +39,7 @@ class BrandService:
         Returns:
             Created brand
         """
-        brand = Brand(**brand_data.model_dump())
+        brand = Brand(**brand_data.model_dump(), user_id=current_user.profile.id)
         db.add(brand)
         await db.commit()
         await db.refresh(brand)
@@ -46,6 +49,7 @@ class BrandService:
     async def get_brand(
         db: AsyncSession,
         brand_id: UUID,
+        current_user: UserContext | None = None,
     ) -> Brand:
         """
         Get brand by ID.
@@ -66,12 +70,36 @@ class BrandService:
         brand = result.scalar_one_or_none()
         if not brand:
             raise BrandNotFoundError(str(brand_id))
+        if (
+            current_user
+            and current_user.role != "admin"
+            and brand.user_id
+            and brand.user_id != current_user.profile.id
+        ):
+            raise AccessDeniedError("Access denied for this brand")
         return brand
+
+    @staticmethod
+    async def get_brand_by_user(
+        db: AsyncSession,
+        user_id: UUID,
+    ) -> Brand | None:
+        """
+        Get brand by owning user_id.
+        """
+        result = await db.execute(
+            select(Brand).where(
+                Brand.user_id == user_id,
+                Brand.deleted_at.is_(None),
+            )
+        )
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def list_brands(
         db: AsyncSession,
         query: BrandListQuery,
+        current_user: UserContext,
     ) -> tuple[list[Brand], int]:
         """
         List brands with pagination.
@@ -85,6 +113,11 @@ class BrandService:
         """
         stmt = select(Brand).where(Brand.deleted_at.is_(None))
         count_stmt = select(func.count()).select_from(Brand).where(Brand.deleted_at.is_(None))
+
+        # Non-admin users are restricted to their own brand
+        if not current_user.role == "admin":
+            stmt = stmt.where(Brand.user_id == current_user.profile.id)
+            count_stmt = count_stmt.where(Brand.user_id == current_user.profile.id)
 
         total_result = await db.execute(count_stmt)
         total = total_result.scalar_one()
@@ -101,6 +134,7 @@ class BrandService:
         db: AsyncSession,
         brand_id: UUID,
         update_data: BrandUpdate,
+        current_user: UserContext,
     ) -> Brand:
         """
         Update a brand.
@@ -116,7 +150,7 @@ class BrandService:
         Raises:
             BrandNotFoundError: If brand not found
         """
-        brand = await BrandService.get_brand(db, brand_id)
+        brand = await BrandService.get_brand(db, brand_id, current_user)
 
         update_dict = update_data.model_dump(exclude_unset=True)
         if update_dict:
@@ -133,6 +167,7 @@ class BrandService:
     async def delete_brand(
         db: AsyncSession,
         brand_id: UUID,
+        current_user: UserContext,
     ) -> None:
         """
         Soft delete a brand (if not referenced by audit instances).
@@ -145,7 +180,7 @@ class BrandService:
             BrandNotFoundError: If brand not found
             ReferentialIntegrityError: If brand is referenced by audit instances
         """
-        brand = await BrandService.get_brand(db, brand_id)
+        brand = await BrandService.get_brand(db, brand_id, current_user)
 
         # Check if brand is referenced
         is_referenced, reference_type = await check_brand_references(db, str(brand_id))
@@ -165,6 +200,7 @@ class ProductService:
         db: AsyncSession,
         brand_id: UUID,
         product_data: ProductCreate,
+        current_user: UserContext,
     ) -> Product:
         """
         Create a new product.
@@ -180,8 +216,8 @@ class ProductService:
         Raises:
             BrandNotFoundError: If brand not found
         """
-        # Verify brand exists
-        await BrandService.get_brand(db, brand_id)
+        # Verify brand exists and ownership
+        await BrandService.get_brand(db, brand_id, current_user)
 
         product = Product(brand_id=brand_id, **product_data.model_dump())
         db.add(product)
@@ -193,6 +229,7 @@ class ProductService:
     async def get_products_by_brand(
         db: AsyncSession,
         brand_id: UUID,
+        current_user: UserContext,
     ) -> list[Product]:
         """
         Get all products for a brand.
@@ -207,8 +244,8 @@ class ProductService:
         Raises:
             BrandNotFoundError: If brand not found
         """
-        # Verify brand exists
-        await BrandService.get_brand(db, brand_id)
+        # Verify brand exists and ownership
+        await BrandService.get_brand(db, brand_id, current_user)
 
         result = await db.execute(
             select(Product).where(Product.brand_id == brand_id, Product.deleted_at.is_(None))
@@ -225,6 +262,7 @@ class SupplyChainNodeService:
         db: AsyncSession,
         brand_id: UUID,
         node_data: SupplyChainNodeCreate,
+        current_user: UserContext,
     ) -> SupplyChainNode:
         """
         Create a new supply chain node.
@@ -240,8 +278,8 @@ class SupplyChainNodeService:
         Raises:
             BrandNotFoundError: If brand not found
         """
-        # Verify brand exists
-        await BrandService.get_brand(db, brand_id)
+        # Verify brand exists and ownership
+        await BrandService.get_brand(db, brand_id, current_user)
 
         node = SupplyChainNode(brand_id=brand_id, **node_data.model_dump())
         db.add(node)
@@ -253,6 +291,7 @@ class SupplyChainNodeService:
     async def get_nodes_by_brand(
         db: AsyncSession,
         brand_id: UUID,
+        current_user: UserContext,
     ) -> list[SupplyChainNode]:
         """
         Get all supply chain nodes for a brand.
@@ -267,8 +306,8 @@ class SupplyChainNodeService:
         Raises:
             BrandNotFoundError: If brand not found
         """
-        # Verify brand exists
-        await BrandService.get_brand(db, brand_id)
+        # Verify brand exists and ownership
+        await BrandService.get_brand(db, brand_id, current_user)
 
         result = await db.execute(
             select(SupplyChainNode).where(

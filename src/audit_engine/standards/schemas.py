@@ -97,4 +97,3 @@ __all__ = [
     "RuleResponse",
     "RuleListResponse",
 ]
-

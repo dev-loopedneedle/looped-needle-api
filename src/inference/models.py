@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlmodel import Field, SQLModel
 
-from src.audit_engine.constants import (
+from src.inference.constants import (
     AuditInstanceStatus,
     AuditItemStatus,
     CompanySize,
@@ -28,18 +28,8 @@ class Brand(SQLModel, table=True):
     )
     name: str = Field(max_length=255, index=True)
     registration_country: str
-    company_size: CompanySize = Field(sa_column=Column(String, nullable=False))
+    company_size: CompanySize
     target_markets: list[str] = Field(default_factory=list, sa_column=Column(ARRAY(String)))
-    user_id: UUID | None = Field(
-        default=None,
-        sa_column=Column(
-            PostgresUUID(as_uuid=True),
-            ForeignKey("user_profiles.id", ondelete="RESTRICT"),
-            nullable=True,
-            unique=True,
-            index=True,
-        ),
-    )
     deleted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), index=True)
     )
@@ -160,7 +150,7 @@ class SustainabilityCriterion(SQLModel, table=True):
     code: str = Field(unique=True, index=True)
     name: str
     description: str
-    domain: SustainabilityDomain = Field(sa_column=Column(String, nullable=False))
+    domain: SustainabilityDomain
     deleted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), index=True)
     )
@@ -273,18 +263,14 @@ class AuditInstance(SQLModel, table=True):
             PostgresUUID(as_uuid=True), ForeignKey("brands.id", ondelete="RESTRICT"), nullable=False
         )
     )
-    questionnaire_definition_id: UUID | None = Field(
-        default=None,
+    questionnaire_definition_id: UUID = Field(
         sa_column=Column(
             PostgresUUID(as_uuid=True),
             ForeignKey("questionnaire_definitions.id", ondelete="RESTRICT"),
-            nullable=True,
-        ),
+            nullable=False,
+        )
     )
-    status: AuditInstanceStatus = Field(
-        default=AuditInstanceStatus.IN_PROGRESS,
-        sa_column=Column(String, nullable=False, server_default="IN_PROGRESS", index=True),
-    )
+    status: AuditInstanceStatus = Field(default=AuditInstanceStatus.IN_PROGRESS, index=True)
     scoping_responses: dict[str, Any] = Field(
         default_factory=dict, sa_column=Column(JSONB, nullable=False)
     )
@@ -359,10 +345,7 @@ class AuditItem(SQLModel, table=True):
             nullable=False,
         )
     )
-    status: AuditItemStatus = Field(
-        default=AuditItemStatus.MISSING_EVIDENCE,
-        sa_column=Column(String, nullable=False, server_default="MISSING_EVIDENCE", index=True),
-    )
+    status: AuditItemStatus = Field(default=AuditItemStatus.MISSING_EVIDENCE, index=True)
     auditor_comments: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     deleted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), index=True)

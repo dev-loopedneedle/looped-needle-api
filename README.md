@@ -227,6 +227,12 @@ CORS_ORIGINS=*
 # OpenAI Configuration (optional)
 OPENAI_API_KEY=sk-your-openai-api-key-here
 
+# Clerk Configuration (required for authenticated endpoints)
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key
+
+# Optional: restrict allowed authorized parties (azp) for Clerk tokens
+# CLERK_AUTHORIZED_PARTIES=https://app.yourdomain.com,https://staging.yourdomain.com
+
 # Logging Configuration
 LOG_LEVEL=INFO
 LOG_FORMAT=json

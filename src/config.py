@@ -1,5 +1,9 @@
 """Global configuration using Pydantic BaseSettings."""
 
+import json
+from typing import Any
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +26,12 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     openai_api_key: str = ""
 
+    # Clerk Configuration
+    clerk_secret_key: str = ""
+    clerk_publishable_key: str = ""
+    # Optional: used by Clerk request authentication (azp/authorized parties checks)
+    clerk_authorized_parties: list[str] = []
+
     # Logging Configuration
     log_level: str = "INFO"
     log_format: str = "json"
@@ -36,6 +46,30 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("clerk_authorized_parties", mode="before")
+    @classmethod
+    def _parse_clerk_authorized_parties(cls, v: Any) -> Any:
+        """
+        Allow CLERK_AUTHORIZED_PARTIES to be provided as:
+        - CSV: "https://app.example.com,https://staging.example.com"
+        - JSON list: ["https://app.example.com", "https://staging.example.com"]
+        """
+        if v is None or v == "":
+            return []
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            s = v.strip()
+            if s.startswith("["):
+                try:
+                    parsed = json.loads(s)
+                    return parsed
+                except json.JSONDecodeError:
+                    # Fall back to CSV parsing if JSON is malformed
+                    pass
+            return [part.strip() for part in s.split(",") if part.strip()]
+        return v
 
 
 settings = Settings()

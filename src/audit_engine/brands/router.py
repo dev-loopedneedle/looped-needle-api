@@ -23,6 +23,7 @@ from src.audit_engine.brands.service import (
     SupplyChainNodeService,
 )
 from src.audit_engine.dependencies import get_audit_engine_db
+from src.auth.dependencies import UserContext, get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["brands"])
 logger = logging.getLogger(__name__)
@@ -44,12 +45,13 @@ def _get_request_id(request: Request) -> str | None:
 async def create_brand(
     request: Request,
     brand_data: BrandCreate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandResponse:
     """Create a new brand."""
     request_id = _get_request_id(request)
     logger.info(f"Creating brand: name={brand_data.name}", extra={"request_id": request_id})
-    brand = await BrandService.create_brand(db, brand_data)
+    brand = await BrandService.create_brand(db, brand_data, current_user)
     return BrandResponse.model_validate(brand)
 
 
@@ -63,13 +65,14 @@ async def list_brands(
     request: Request,
     limit: int = Query(default=20, ge=1, le=50, description="Maximum number of records to return"),
     offset: int = Query(default=0, ge=0, description="Number of records to skip"),
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandListResponse:
     """List brands with pagination."""
     request_id = _get_request_id(request)
     logger.info(f"Listing brands: limit={limit}, offset={offset}", extra={"request_id": request_id})
     query = BrandListQuery(limit=limit, offset=offset)
-    brands, total = await BrandService.list_brands(db, query)
+    brands, total = await BrandService.list_brands(db, query, current_user)
     return BrandListResponse(
         items=[BrandResponse.model_validate(brand) for brand in brands],
         total=total,
@@ -87,12 +90,13 @@ async def list_brands(
 async def get_brand(
     request: Request,
     brand_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandResponse:
     """Get brand by ID."""
     request_id = _get_request_id(request)
     logger.info(f"Getting brand: id={brand_id}", extra={"request_id": request_id})
-    brand = await BrandService.get_brand(db, brand_id)
+    brand = await BrandService.get_brand(db, brand_id, current_user)
     return BrandResponse.model_validate(brand)
 
 
@@ -106,12 +110,13 @@ async def update_brand(
     request: Request,
     brand_id: UUID,
     brand_data: BrandUpdate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> BrandResponse:
     """Update brand."""
     request_id = _get_request_id(request)
     logger.info(f"Updating brand: id={brand_id}", extra={"request_id": request_id})
-    brand = await BrandService.update_brand(db, brand_id, brand_data)
+    brand = await BrandService.update_brand(db, brand_id, brand_data, current_user)
     return BrandResponse.model_validate(brand)
 
 
@@ -124,12 +129,13 @@ async def update_brand(
 async def delete_brand(
     request: Request,
     brand_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> None:
     """Delete brand (soft delete)."""
     request_id = _get_request_id(request)
     logger.info(f"Deleting brand: id={brand_id}", extra={"request_id": request_id})
-    await BrandService.delete_brand(db, brand_id)
+    await BrandService.delete_brand(db, brand_id, current_user)
 
 
 # Product endpoints
@@ -144,6 +150,7 @@ async def create_product(
     request: Request,
     brand_id: UUID,
     product_data: ProductCreate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> ProductResponse:
     """Create a new product."""
@@ -151,7 +158,7 @@ async def create_product(
     logger.info(
         f"Creating product for brand: brand_id={brand_id}", extra={"request_id": request_id}
     )
-    product = await ProductService.create_product(db, brand_id, product_data)
+    product = await ProductService.create_product(db, brand_id, product_data, current_user)
     return ProductResponse.model_validate(product)
 
 
@@ -164,6 +171,7 @@ async def create_product(
 async def list_products(
     request: Request,
     brand_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> list[ProductResponse]:
     """List products for a brand."""
@@ -171,7 +179,7 @@ async def list_products(
     logger.info(
         f"Listing products for brand: brand_id={brand_id}", extra={"request_id": request_id}
     )
-    products = await ProductService.get_products_by_brand(db, brand_id)
+    products = await ProductService.get_products_by_brand(db, brand_id, current_user)
     return [ProductResponse.model_validate(product) for product in products]
 
 
@@ -187,6 +195,7 @@ async def create_supply_chain_node(
     request: Request,
     brand_id: UUID,
     node_data: SupplyChainNodeCreate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> SupplyChainNodeResponse:
     """Create a new supply chain node."""
@@ -195,7 +204,7 @@ async def create_supply_chain_node(
         f"Creating supply chain node for brand: brand_id={brand_id}",
         extra={"request_id": request_id},
     )
-    node = await SupplyChainNodeService.create_node(db, brand_id, node_data)
+    node = await SupplyChainNodeService.create_node(db, brand_id, node_data, current_user)
     return SupplyChainNodeResponse.model_validate(node)
 
 
@@ -208,6 +217,7 @@ async def create_supply_chain_node(
 async def list_supply_chain_nodes(
     request: Request,
     brand_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> list[SupplyChainNodeResponse]:
     """List supply chain nodes for a brand."""
@@ -216,6 +226,6 @@ async def list_supply_chain_nodes(
         f"Listing supply chain nodes for brand: brand_id={brand_id}",
         extra={"request_id": request_id},
     )
-    nodes = await SupplyChainNodeService.get_nodes_by_brand(db, brand_id)
+    nodes = await SupplyChainNodeService.get_nodes_by_brand(db, brand_id, current_user)
     return [SupplyChainNodeResponse.model_validate(node) for node in nodes]
 

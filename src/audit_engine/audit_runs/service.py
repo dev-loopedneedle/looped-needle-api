@@ -8,7 +8,12 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.audit_engine.audit_runs.schemas import AuditInstanceCreate, AuditInstanceListQuery, AuditInstanceUpdate, AuditItemUpdate
+from src.audit_engine.audit_runs.schemas import (
+    AuditInstanceCreate,
+    AuditInstanceListQuery,
+    AuditInstanceUpdate,
+    AuditItemUpdate,
+)
 from src.audit_engine.brands.service import BrandService, ProductService, SupplyChainNodeService
 from src.audit_engine.engine.context_builder import capture_brand_context
 from src.audit_engine.engine.evaluator import RuleEvaluator
@@ -19,7 +24,13 @@ from src.audit_engine.exceptions import (
 )
 from src.audit_engine.models import AuditInstance, AuditItem, CriteriaRule, SustainabilityCriterion
 from src.audit_engine.questionnaires.service import QuestionnaireService
-from src.audit_engine.utils import can_transition_audit_item, validate_audit_instance_status_transition
+from src.audit_engine.utils import (
+    can_transition_audit_item,
+    validate_audit_instance_status_transition,
+)
+from src.auth.dependencies import UserContext
+
+logger = logging.getLogger(__name__)
 
 
 class AuditInstanceService:
@@ -29,6 +40,7 @@ class AuditInstanceService:
     async def create_audit_instance(
         db: AsyncSession,
         audit_data: AuditInstanceCreate,
+        current_user: UserContext,
     ) -> AuditInstance:
         """
         Create a new audit instance with brand context snapshot.
@@ -45,16 +57,16 @@ class AuditInstanceService:
             QuestionnaireNotFoundError: If questionnaire not found
         """
         # Verify brand exists
-        brand = await BrandService.get_brand(db, audit_data.brand_id)
+        brand = await BrandService.get_brand(db, audit_data.brand_id, current_user)
 
         # Verify questionnaire exists if provided
         if audit_data.questionnaire_definition_id:
             await QuestionnaireService.get_questionnaire(db, audit_data.questionnaire_definition_id)
 
         # Capture brand context snapshot
-        products = await ProductService.get_products_by_brand(db, audit_data.brand_id)
+        products = await ProductService.get_products_by_brand(db, audit_data.brand_id, current_user)
         supply_chain_nodes = await SupplyChainNodeService.get_nodes_by_brand(
-            db, audit_data.brand_id
+            db, audit_data.brand_id, current_user
         )
         brand_context_snapshot = capture_brand_context(brand, products, supply_chain_nodes)
 
@@ -98,9 +110,27 @@ class AuditInstanceService:
         return audit_instance
 
     @staticmethod
+    async def get_audit_instance_with_access(
+        db: AsyncSession,
+        audit_instance_id: UUID,
+        current_user: UserContext,
+    ) -> AuditInstance:
+        """
+        Get audit instance and enforce role-based access:
+        - Admin users can access any audit instance
+        - Non-admin users must own the brand associated with the audit instance
+        """
+        audit_instance = await AuditInstanceService.get_audit_instance(db, audit_instance_id)
+        if current_user.role != "admin":
+            # Validate ownership via brand
+            await BrandService.get_brand(db, audit_instance.brand_id, current_user)
+        return audit_instance
+
+    @staticmethod
     async def list_audit_instances(
         db: AsyncSession,
         query: AuditInstanceListQuery,
+        current_user: UserContext,
     ) -> tuple[list[AuditInstance], int]:
         """
         List audit instances with filtering and pagination.
@@ -121,7 +151,14 @@ class AuditInstanceService:
             .where(AuditInstance.deleted_at.is_(None))
         )
 
-        if query.brand_id:
+        # Enforce role-based visibility: admins can view all; non-admins are restricted to their brand
+        if current_user.role != "admin":
+            user_brand = await BrandService.get_brand_by_user(db, current_user.profile.id)
+            if not user_brand:
+                return [], 0
+            stmt = stmt.where(AuditInstance.brand_id == user_brand.id)
+            count_stmt = count_stmt.where(AuditInstance.brand_id == user_brand.id)
+        elif query.brand_id:
             stmt = stmt.where(AuditInstance.brand_id == query.brand_id)
             count_stmt = count_stmt.where(AuditInstance.brand_id == query.brand_id)
 
@@ -146,6 +183,7 @@ class AuditInstanceService:
         db: AsyncSession,
         audit_instance_id: UUID,
         update_data: AuditInstanceUpdate,
+        current_user: UserContext,
     ) -> AuditInstance:
         """
         Update audit instance status with state transition validation.
@@ -161,7 +199,9 @@ class AuditInstanceService:
         Raises:
             AuditInstanceNotFoundError: If audit instance not found
         """
-        audit_instance = await AuditInstanceService.get_audit_instance(db, audit_instance_id)
+        audit_instance = await AuditInstanceService.get_audit_instance_with_access(
+            db, audit_instance_id, current_user
+        )
 
         update_dict = update_data.model_dump(exclude_unset=True)
         if update_dict:
@@ -193,6 +233,7 @@ class AuditItemService:
         self,
         db: AsyncSession,
         audit_instance_id: UUID,
+        current_user: UserContext,
     ) -> dict[str, int]:
         """
         Generate audit items by evaluating rules against brand context and questionnaire responses.
@@ -208,7 +249,9 @@ class AuditItemService:
             AuditInstanceNotFoundError: If audit instance not found
         """
         # Get audit instance with context
-        audit_instance = await AuditInstanceService.get_audit_instance(db, audit_instance_id)
+        audit_instance = await AuditInstanceService.get_audit_instance_with_access(
+            db, audit_instance_id, current_user
+        )
 
         # Get existing audit items to preserve those with evidence
         existing_items_result = await db.execute(
@@ -323,6 +366,7 @@ class AuditItemService:
         self,
         db: AsyncSession,
         audit_instance_id: UUID,
+        current_user: UserContext,
     ) -> list[AuditItem]:
         """
         Get all audit items for an audit instance.
@@ -337,8 +381,10 @@ class AuditItemService:
         Raises:
             AuditInstanceNotFoundError: If audit instance not found
         """
-        # Verify audit instance exists
-        await AuditInstanceService.get_audit_instance(db, audit_instance_id)
+        # Verify audit instance exists and access
+        await AuditInstanceService.get_audit_instance_with_access(
+            db, audit_instance_id, current_user
+        )
 
         result = await db.execute(
             select(AuditItem).where(
@@ -352,6 +398,7 @@ class AuditItemService:
         self,
         db: AsyncSession,
         audit_item_id: UUID,
+        current_user: UserContext,
     ) -> AuditItem:
         """
         Get audit item by ID.
@@ -372,6 +419,10 @@ class AuditItemService:
         audit_item = result.scalar_one_or_none()
         if not audit_item:
             raise AuditItemNotFoundError(str(audit_item_id))
+        if current_user.role != "admin":
+            await AuditInstanceService.get_audit_instance_with_access(
+                db, audit_item.audit_instance_id, current_user
+            )
         return audit_item
 
     async def update_audit_item(
@@ -379,6 +430,7 @@ class AuditItemService:
         db: AsyncSession,
         audit_item_id: UUID,
         update_data: AuditItemUpdate,
+        current_user: UserContext,
     ) -> AuditItem:
         """
         Update audit item with status transition validation.
@@ -394,7 +446,7 @@ class AuditItemService:
         Raises:
             AuditItemNotFoundError: If audit item not found
         """
-        audit_item = await self.get_audit_item(db, audit_item_id)
+        audit_item = await self.get_audit_item(db, audit_item_id, current_user)
 
         update_dict = update_data.model_dump(exclude_unset=True)
         if update_dict:

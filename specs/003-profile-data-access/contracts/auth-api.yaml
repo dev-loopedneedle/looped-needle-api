@@ -1,0 +1,125 @@
+openapi: 3.1.0
+info:
+  title: Authentication API
+  description: Authentication and user profile management endpoints
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: auth
+    description: Authentication and user profile operations
+
+security:
+  - BearerAuth: []
+
+paths:
+  /me:
+    get:
+      summary: Get current user profile
+      description: Retrieve the authenticated user's profile information
+      operationId: getCurrentUser
+      tags:
+        - auth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Clerk authentication token (JWT)
+
+  schemas:
+    UserProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User profile unique identifier
+        clerk_user_id:
+          type: string
+          description: Clerk user identifier
+        is_active:
+          type: boolean
+          description: Profile active status
+        role:
+          type: string
+          nullable: true
+          description: User role extracted from Clerk public_metadata (e.g., "admin")
+        created_at:
+          type: string
+          format: date-time
+          description: Profile creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last update timestamp
+        last_access_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last authentication timestamp
+      required:
+        - id
+        - clerk_user_id
+        - is_active
+        - created_at
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Human-readable error message
+        status_code:
+          type: integer
+          description: HTTP status code
+        request_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Request identifier for tracing
+
+  responses:
+    Unauthorized:
+      description: Authentication failed - invalid or expired token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "AuthenticationError"
+            message: "Invalid or expired authentication token"
+            status_code: 401
+
+    ServiceUnavailable:
+      description: Authentication service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "ServiceUnavailable"
+            message: "Authentication service unavailable"
+            status_code: 503
+

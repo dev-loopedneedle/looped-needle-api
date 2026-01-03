@@ -68,4 +68,3 @@ __all__ = [
     "QuestionnaireListQuery",
     "QuestionnaireListResponse",
 ]
-

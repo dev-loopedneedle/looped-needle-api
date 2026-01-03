@@ -20,6 +20,7 @@ from src.audit_engine.audit_runs.schemas import (
 from src.audit_engine.audit_runs.service import AuditInstanceService, AuditItemService
 from src.audit_engine.constants import AuditInstanceStatus
 from src.audit_engine.dependencies import get_audit_engine_db
+from src.auth.dependencies import UserContext, get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["audit-runs"])
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ def _get_request_id(request: Request) -> str | None:
 async def create_audit_instance(
     request: Request,
     audit_data: AuditInstanceCreate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceResponse:
     """Create a new audit instance."""
@@ -49,7 +51,7 @@ async def create_audit_instance(
         f"Creating audit instance: brand_id={audit_data.brand_id}, questionnaire_id={audit_data.questionnaire_definition_id}",
         extra={"request_id": request_id},
     )
-    audit_instance = await AuditInstanceService.create_audit_instance(db, audit_data)
+    audit_instance = await AuditInstanceService.create_audit_instance(db, audit_data, current_user)
     return AuditInstanceResponse.model_validate(audit_instance)
 
 
@@ -65,6 +67,7 @@ async def list_audit_instances(
     status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(default=20, ge=1, le=50, description="Maximum number of records to return"),
     offset: int = Query(default=0, ge=0, description="Number of records to skip"),
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceListResponse:
     """List audit instances with pagination."""
@@ -80,7 +83,9 @@ async def list_audit_instances(
         limit=limit,
         offset=offset,
     )
-    audit_instances, total = await AuditInstanceService.list_audit_instances(db, query)
+    audit_instances, total = await AuditInstanceService.list_audit_instances(
+        db, query, current_user
+    )
     return AuditInstanceListResponse(
         items=[AuditInstanceResponse.model_validate(ai) for ai in audit_instances],
         total=total,
@@ -98,12 +103,15 @@ async def list_audit_instances(
 async def get_audit_instance(
     request: Request,
     audit_instance_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceResponse:
     """Get audit instance by ID."""
     request_id = _get_request_id(request)
     logger.info(f"Getting audit instance: id={audit_instance_id}", extra={"request_id": request_id})
-    audit_instance = await AuditInstanceService.get_audit_instance(db, audit_instance_id)
+    audit_instance = await AuditInstanceService.get_audit_instance_with_access(
+        db, audit_instance_id, current_user
+    )
     return AuditInstanceResponse.model_validate(audit_instance)
 
 
@@ -117,6 +125,7 @@ async def update_audit_instance(
     request: Request,
     audit_instance_id: UUID,
     audit_data: AuditInstanceUpdate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditInstanceResponse:
     """Update audit instance."""
@@ -125,7 +134,7 @@ async def update_audit_instance(
         f"Updating audit instance: id={audit_instance_id}", extra={"request_id": request_id}
     )
     audit_instance = await AuditInstanceService.update_audit_instance_status(
-        db, audit_instance_id, audit_data
+        db, audit_instance_id, audit_data, current_user
     )
     return AuditInstanceResponse.model_validate(audit_instance)
 
@@ -141,6 +150,7 @@ async def update_audit_instance(
 async def generate_audit_items(
     request: Request,
     audit_instance_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemGenerationResponse:
     """Generate audit items for an audit instance."""
@@ -150,7 +160,7 @@ async def generate_audit_items(
         extra={"request_id": request_id},
     )
     service = AuditItemService()
-    stats = await service.generate_audit_items(db, audit_instance_id)
+    stats = await service.generate_audit_items(db, audit_instance_id, current_user)
     return AuditItemGenerationResponse(
         items_created=stats["items_created"],
         items_preserved=stats["items_preserved"],
@@ -169,6 +179,7 @@ async def generate_audit_items(
 async def list_audit_items(
     request: Request,
     audit_instance_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemListResponse:
     """List audit items for an audit instance."""
@@ -178,7 +189,7 @@ async def list_audit_items(
         extra={"request_id": request_id},
     )
     service = AuditItemService()
-    items = await service.get_audit_items_by_instance(db, audit_instance_id)
+    items = await service.get_audit_items_by_instance(db, audit_instance_id, current_user)
     return AuditItemListResponse(
         items=[AuditItemResponse.model_validate(item) for item in items],
         total=len(items),
@@ -194,13 +205,14 @@ async def list_audit_items(
 async def get_audit_item(
     request: Request,
     audit_item_id: UUID,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemResponse:
     """Get audit item by ID."""
     request_id = _get_request_id(request)
     logger.info(f"Getting audit item: id={audit_item_id}", extra={"request_id": request_id})
     service = AuditItemService()
-    audit_item = await service.get_audit_item(db, audit_item_id)
+    audit_item = await service.get_audit_item(db, audit_item_id, current_user)
     return AuditItemResponse.model_validate(audit_item)
 
 
@@ -214,12 +226,15 @@ async def update_audit_item(
     request: Request,
     audit_item_id: UUID,
     audit_item_data: AuditItemUpdate,
+    current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_audit_engine_db),
 ) -> AuditItemResponse:
     """Update audit item."""
     request_id = _get_request_id(request)
     logger.info(f"Updating audit item: id={audit_item_id}", extra={"request_id": request_id})
     service = AuditItemService()
-    audit_item = await service.update_audit_item(db, audit_item_id, audit_item_data)
+    audit_item = await service.update_audit_item(
+        db, audit_item_id, audit_item_data, current_user
+    )
     return AuditItemResponse.model_validate(audit_item)
 
