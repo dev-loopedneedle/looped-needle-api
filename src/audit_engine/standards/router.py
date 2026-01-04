@@ -186,4 +186,3 @@ async def update_rule(
     logger.info(f"Updating rule: id={rule_id}", extra={"request_id": request_id})
     rule = await RuleService.update_rule(db, rule_id, rule_data)
     return RuleResponse.model_validate(rule)
-

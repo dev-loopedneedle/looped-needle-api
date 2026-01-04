@@ -82,4 +82,3 @@ components:
                 enum: [healthy, unhealthy]
               message:
                 type: string
-

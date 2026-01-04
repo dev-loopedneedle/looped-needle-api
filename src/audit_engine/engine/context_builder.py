@@ -47,4 +47,3 @@ def capture_brand_context(
             for node in supply_chain_nodes
         ],
     }
-

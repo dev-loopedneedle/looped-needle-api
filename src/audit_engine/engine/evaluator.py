@@ -41,4 +41,3 @@ class RuleEvaluator:
                 f"Rule evaluation failed: {error_msg}", extra={"expression": expression}
             )
             return False, error_msg
-

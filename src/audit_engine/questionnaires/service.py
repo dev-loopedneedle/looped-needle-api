@@ -105,4 +105,3 @@ class QuestionnaireService:
         questionnaires = result.scalars().all()
 
         return list(questionnaires), total
-

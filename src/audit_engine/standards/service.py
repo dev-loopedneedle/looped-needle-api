@@ -227,4 +227,3 @@ class RuleService:
             await db.refresh(rule)
 
         return rule
-

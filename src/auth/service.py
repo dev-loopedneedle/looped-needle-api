@@ -17,9 +17,7 @@ class UserProfileService:
     """Service for user profile operations."""
 
     @staticmethod
-    async def get_or_create_user_profile(
-        db: AsyncSession, clerk_user_id: str
-    ) -> UserProfile:
+    async def get_or_create_user_profile(db: AsyncSession, clerk_user_id: str) -> UserProfile:
         """
         Get or create user profile with idempotent creation.
 
@@ -92,4 +90,3 @@ class UserProfileService:
         """
         result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
         return result.scalar_one_or_none()
-

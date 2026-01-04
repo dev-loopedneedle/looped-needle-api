@@ -151,4 +151,3 @@ context.company_size == 'Large' && scope.has_wet_processing == True
 2. Add more helper functions as needed
 3. Document expression syntax for rule creators
 4. Consider adding JEXL from GitHub if exact syntax is required
-

@@ -91,4 +91,3 @@ async def get_questionnaire(
     logger.info(f"Getting questionnaire: id={questionnaire_id}", extra={"request_id": request_id})
     questionnaire = await QuestionnaireService.get_questionnaire(db, questionnaire_id)
     return QuestionnaireDefinitionResponse.model_validate(questionnaire)
-

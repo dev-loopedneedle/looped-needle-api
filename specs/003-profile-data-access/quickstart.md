@@ -225,4 +225,3 @@ Brands created before authentication implementation will have `user_id = NULL` (
 - Review [data-model.md](./data-model.md) for database schema details
 - Review [contracts/auth-api.yaml](./contracts/auth-api.yaml) for API specifications
 - See [plan.md](./plan.md) for implementation details
-

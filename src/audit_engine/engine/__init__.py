@@ -5,4 +5,3 @@ from src.audit_engine.engine.evaluator import RuleEvaluator
 from src.audit_engine.engine.expression_evaluator import ExpressionEvaluator
 
 __all__ = ["ExpressionEvaluator", "RuleEvaluator", "capture_brand_context"]
-

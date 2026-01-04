@@ -197,7 +197,11 @@ All configuration is managed through environment variables. Create a `.env` file
 ### Optional Variables
 
 **CORS Configuration:**
-- `CORS_ORIGINS` (default: `["*"]`): List of allowed CORS origins. Use `*` for development (allows all origins). For production, specify exact origins: `["https://example.com", "https://app.example.com"]`
+- `ALLOWED_ORIGINS` (default: `["*"]`): List of allowed CORS origins. Can be provided as:
+  - CSV: `"https://app.example.com,https://staging.example.com"`
+  - JSON list: `["https://app.example.com", "https://staging.example.com"]`
+  - Single value: `"*"` for development (allows all origins)
+  - For production, specify exact origins
 
 **OpenAI Configuration:**
 - `OPENAI_API_KEY` (optional): OpenAI API key for AI features. Required only if using OpenAI integration endpoints.
@@ -222,7 +226,7 @@ API_V1_PREFIX=/api/v1
 SECRET_KEY=your-secret-key-change-in-production
 
 # CORS Configuration (development - allow all origins)
-CORS_ORIGINS=*
+ALLOWED_ORIGINS=*
 
 # OpenAI Configuration (optional)
 OPENAI_API_KEY=sk-your-openai-api-key-here
@@ -246,7 +250,7 @@ VERSION=1.0.0
 
 - **Never commit `.env` files** to version control
 - Use secure secret management (e.g., AWS Secrets Manager, HashiCorp Vault) in production
-- Set `CORS_ORIGINS` to specific domains, not `*`
+- Set `ALLOWED_ORIGINS` to specific domains, not `*`
 - Use strong `SECRET_KEY` values
 - Set `LOG_LEVEL` to `INFO` or `WARNING` in production
 - Ensure `DATABASE_URL` uses SSL/TLS in production
@@ -463,4 +467,3 @@ All error responses follow a consistent format:
 ## License
 
 [Add your license here]
-

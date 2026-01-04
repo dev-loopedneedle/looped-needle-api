@@ -50,4 +50,3 @@ def downgrade() -> None:
     op.drop_index("entity_type_idx", table_name="audit")
     op.drop_index("action_type_idx", table_name="audit")
     op.drop_table("audit")
-
