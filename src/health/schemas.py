@@ -20,3 +20,4 @@ class HealthResponse(BaseModel):
     timestamp: datetime
     version: str
     checks: dict[str, Any] | None = None
+

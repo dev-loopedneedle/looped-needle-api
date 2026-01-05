@@ -35,3 +35,4 @@
 - All user stories are independently testable and deliver value
 - Success criteria are measurable and technology-agnostic
 - Assumptions are clearly documented
+

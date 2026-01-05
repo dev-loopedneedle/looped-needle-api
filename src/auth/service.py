@@ -90,3 +90,4 @@ class UserProfileService:
         """
         result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
         return result.scalar_one_or_none()
+

@@ -8,11 +8,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.audit_engine.dependencies import get_audit_engine_db
 from src.auth.clerk_client import ClerkClient
 from src.auth.exceptions import AuthenticationError, ServiceUnavailableError
 from src.auth.models import UserProfile
 from src.auth.service import UserProfileService
+from src.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class UserContext:
 
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-    db: Annotated[AsyncSession, Depends(get_audit_engine_db)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserContext:
     """
     Get current authenticated user from Clerk token.

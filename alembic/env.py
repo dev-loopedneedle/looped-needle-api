@@ -9,6 +9,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
 from alembic import context
+from src.audit_workflows.models import AuditWorkflow
+from src.audits.models import Audit
+from src.auth.models import UserProfile
+from src.brands.models import Brand
 from src.config import settings
 
 config = context.config
@@ -25,19 +29,6 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import models for autogenerate (must be after config setup)
-from src.audit_engine.models import (  # noqa: E402, F401
-    AuditInstance,
-    AuditItem,
-    Brand,
-    CriteriaRule,
-    Product,
-    QuestionnaireDefinition,
-    SupplyChainNode,
-    SustainabilityCriterion,
-)
-from src.auth.models import UserProfile  # noqa: E402, F401
-
 # Set naming convention for PostgreSQL
 POSTGRES_INDEXES_NAMING_CONVENTION = {
     "ix": "%(column_0_label)s_idx",
@@ -48,6 +39,9 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 }
 
 # Use SQLModel's metadata (models register themselves when imported above)
+# Reference models to ensure they're imported and registered
+_models = (Audit, AuditWorkflow, Brand, UserProfile)
+assert _models  # Ensure models are imported
 SQLModel.metadata.naming_convention = POSTGRES_INDEXES_NAMING_CONVENTION
 target_metadata = SQLModel.metadata
 

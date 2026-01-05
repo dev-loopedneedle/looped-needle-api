@@ -1,0 +1,3 @@
+"""Brands domain module."""
+
+

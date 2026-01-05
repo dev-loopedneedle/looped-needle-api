@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.audit_engine.dependencies import get_audit_engine_db
 from src.auth.dependencies import UserContext, get_current_user
 from src.auth.schemas import UserProfileResponse
+from src.database import get_db
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/v1", tags=["auth"])
 )
 async def get_me(
     current_user: UserContext = Depends(get_current_user),
-    db: AsyncSession = Depends(get_audit_engine_db),
+    db: AsyncSession = Depends(get_db),
 ) -> UserProfileResponse:
     """
     Get current authenticated user profile.

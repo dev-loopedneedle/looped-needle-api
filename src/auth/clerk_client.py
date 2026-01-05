@@ -72,12 +72,13 @@ class ClerkClient:
             claims: dict[str, Any] = {}
             if isinstance(claims_obj, dict):
                 claims = claims_obj
-            elif hasattr(claims_obj, "model_dump"):
-                claims = claims_obj.model_dump()
-            elif hasattr(claims_obj, "dict"):
-                claims = claims_obj.dict()
-            elif claims_obj:
-                claims = dict(claims_obj)
+            elif claims_obj is not None:
+                if hasattr(claims_obj, "model_dump"):
+                    claims = claims_obj.model_dump()
+                elif hasattr(claims_obj, "dict"):
+                    claims = claims_obj.dict()
+                else:
+                    claims = dict(claims_obj)
 
             # Ensure user ID is present in the returned dict as 'sub' for consistency
             if user_id and not claims.get("sub"):

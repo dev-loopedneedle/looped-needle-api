@@ -5,18 +5,17 @@ Revises: 794aba133a29
 Create Date: 2026-01-02 15:51:30.203152
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
-import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '6b9e85ea4cd3'
-down_revision: Union[str, Sequence[str], None] = '794aba133a29'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '794aba133a29'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -36,7 +35,7 @@ def downgrade() -> None:
     # Set a default value for any NULL entries before making it non-nullable
     op.execute(
         """
-        UPDATE audit_instances 
+        UPDATE audit_instances
         SET questionnaire_definition_id = '00000000-0000-0000-0000-000000000000'::uuid
         WHERE questionnaire_definition_id IS NULL
         """

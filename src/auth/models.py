@@ -34,3 +34,4 @@ class UserProfile(SQLModel, table=True):
     )
 
     __table_args__ = (UniqueConstraint("clerk_user_id", name="user_profiles_clerk_user_id_key"),)
+

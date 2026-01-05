@@ -167,3 +167,4 @@ class Audit(SQLModel, table=True):
 - Indexes on frequently queried columns (`action_type`, `entity_type`, `entity_id`, `user_id`, `created_at`)
 - JSONB `details` field allows efficient querying of nested data
 - Pagination required for list endpoints to prevent large result sets
+
