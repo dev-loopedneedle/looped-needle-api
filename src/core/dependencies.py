@@ -14,4 +14,3 @@ def get_request_id(request: Request) -> str | None:
         Request ID string or None if not available
     """
     return getattr(request.state, "request_id", None)
-

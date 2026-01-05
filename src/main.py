@@ -15,6 +15,7 @@ from src.core.logging import setup_logging
 from src.core.middleware import RequestIDMiddleware
 from src.database import engine
 from src.health.router import router as health_router
+from src.waitlist.router import router as waitlist_router
 
 # Setup logging first
 setup_logging()
@@ -61,6 +62,7 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(brands_router)
 app.include_router(audits_router)
+app.include_router(waitlist_router)
 
 
 # Root endpoint

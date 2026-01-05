@@ -51,4 +51,3 @@ class Brand(SQLModel, table=True):
             "company_size IN ('Micro', 'SME', 'Large')", name="brands_company_size_check"
         ),
     )
-

@@ -38,4 +38,3 @@ def setup_logging() -> None:
         handler = logging.StreamHandler()
         handler.setFormatter(JSONFormatter())
         logging.getLogger().handlers = [handler]
-

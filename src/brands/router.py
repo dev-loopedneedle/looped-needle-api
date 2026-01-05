@@ -118,5 +118,3 @@ async def delete_brand(
     """Delete brand (soft delete)."""
     logger.info(f"Deleting brand: id={brand_id}", extra={"request_id": request_id})
     await BrandService.delete_brand(db, brand_id, current_user)
-
-

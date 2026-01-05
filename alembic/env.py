@@ -14,6 +14,7 @@ from src.audits.models import Audit
 from src.auth.models import UserProfile
 from src.brands.models import Brand
 from src.config import settings
+from src.waitlist.models import WaitlistEntry
 
 config = context.config
 
@@ -40,7 +41,7 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 
 # Use SQLModel's metadata (models register themselves when imported above)
 # Reference models to ensure they're imported and registered
-_models = (Audit, AuditWorkflow, Brand, UserProfile)
+_models = (Audit, AuditWorkflow, Brand, UserProfile, WaitlistEntry)
 assert _models  # Ensure models are imported
 SQLModel.metadata.naming_convention = POSTGRES_INDEXES_NAMING_CONVENTION
 target_metadata = SQLModel.metadata
