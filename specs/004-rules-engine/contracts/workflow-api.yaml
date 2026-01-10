@@ -1,0 +1,146 @@
+openapi: 3.0.0
+info:
+  title: Audit Workflows API
+  version: 1.0.0
+paths:
+  /api/v1/audits/{audit_id}/workflow/generate:
+    post:
+      summary: Generate audit workflow
+      description: Manually trigger workflow generation for a draft audit. Published audits cannot have workflows regenerated.
+      tags:
+        - audit-workflows
+      parameters:
+        - name: audit_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '201':
+          description: Workflow generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowResponse'
+        '400':
+          description: Cannot regenerate workflow for published audit
+        '403':
+          description: Access denied
+        '404':
+          description: Audit not found
+  /api/v1/audits/{audit_id}/workflow:
+    get:
+      summary: Get audit workflow
+      description: Retrieve the latest workflow for an audit, including required evidence claims and rule matches.
+      tags:
+        - audit-workflows
+      parameters:
+        - name: audit_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Workflow retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowResponse'
+        '403':
+          description: Access denied
+        '404':
+          description: No workflow found
+components:
+  schemas:
+    WorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        audit_id:
+          type: string
+          format: uuid
+        generation:
+          type: integer
+        status:
+          type: string
+          enum: [GENERATED, STALE]
+        generated_at:
+          type: string
+          format: date-time
+        engine_version:
+          type: string
+        required_claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/RequiredClaimResponse'
+        rule_matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleMatchResponse'
+    RequiredClaimResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        evidence_claim_id:
+          type: string
+          format: uuid
+        evidence_claim_name:
+          type: string
+        evidence_claim_description:
+          type: string
+        evidence_claim_category:
+          type: string
+        evidence_claim_type:
+          type: string
+        evidence_claim_weight:
+          type: number
+        status:
+          type: string
+          enum: [REQUIRED, SATISFIED]
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleSource'
+    RuleSource:
+      type: object
+      properties:
+        rule_id:
+          type: string
+          format: uuid
+        rule_code:
+          type: string
+        rule_name:
+          type: string
+        rule_version:
+          type: integer
+    RuleMatchResponse:
+      type: object
+      properties:
+        rule_id:
+          type: string
+          format: uuid
+        rule_code:
+          type: string
+        rule_version:
+          type: integer
+        matched:
+          type: boolean
+        error:
+          type: string
+        evaluated_at:
+          type: string
+          format: date-time
+

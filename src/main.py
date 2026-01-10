@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.audit_workflows.router import router as audit_workflows_router
 from src.audits.router import router as audits_router
 from src.auth.router import router as auth_router
 from src.brands.router import router as brands_router
@@ -15,6 +16,8 @@ from src.core.logging import setup_logging
 from src.core.middleware import RequestIDMiddleware
 from src.database import engine
 from src.health.router import router as health_router
+from src.rules.admin_router import router as admin_router
+from src.rules.router import router as rules_router
 from src.waitlist.router import router as waitlist_router
 
 # Setup logging first
@@ -62,6 +65,9 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(brands_router)
 app.include_router(audits_router)
+app.include_router(audit_workflows_router)
+app.include_router(admin_router)
+app.include_router(rules_router)
 app.include_router(waitlist_router)
 
 

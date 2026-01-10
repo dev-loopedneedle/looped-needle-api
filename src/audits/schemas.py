@@ -167,33 +167,66 @@ class AuditData(BaseModel):
 class CreateAuditRequest(BaseModel):
     """Schema for creating an audit."""
 
-    brand_id: UUID = Field(..., description="Brand ID (required)")
-    audit_data: AuditData | None = Field(None, description="Audit data (optional for drafts)")
+    brand_id: UUID = Field(
+        ..., alias="brandId", serialization_alias="brandId", description="Brand ID (required)"
+    )
+    audit_data: AuditData | None = Field(
+        None, alias="auditData", serialization_alias="auditData", description="Audit data (optional for drafts)"
+    )
+
+    model_config = {"populate_by_name": True}
 
 
 class UpdateAuditRequest(BaseModel):
     """Schema for updating an audit (status cannot be set directly)."""
 
-    brand_id: UUID | None = Field(None, description="Brand ID (optional)")
-    audit_data: AuditData | None = Field(None, description="Audit data (optional)")
+    brand_id: UUID | None = Field(
+        None, alias="brandId", serialization_alias="brandId", description="Brand ID (optional)"
+    )
+    audit_data: AuditData | None = Field(
+        None, alias="auditData", serialization_alias="auditData", description="Audit data (optional)"
+    )
+
+    model_config = {"populate_by_name": True}
 
 
 class AuditResponse(BaseModel):
     """Schema for audit response."""
 
     id: UUID
-    brand_id: UUID
+    brand_id: UUID = Field(..., alias="brandId", serialization_alias="brandId")
     status: Literal["DRAFT", "PUBLISHED"]
-    audit_data: AuditData | None = Field(None, description="Audit data (optional for drafts)")
-    created_at: datetime
-    updated_at: datetime | None = Field(None, description="Last update timestamp")
+    audit_data: AuditData | None = Field(
+        None, alias="auditData", serialization_alias="auditData", description="Audit data (optional for drafts)"
+    )
+    created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
+    updated_at: datetime | None = Field(
+        None, alias="updatedAt", serialization_alias="updatedAt", description="Last update timestamp"
+    )
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
     @field_serializer("id")
     def serialize_id(self, value: UUID) -> str:
         """Convert UUID to string."""
         return str(value)
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        """Map snake_case model fields to camelCase API fields."""
+        if hasattr(obj, "__dict__"):
+            data = dict(obj.__dict__)
+            # Map fields to camelCase
+            if "brand_id" in data:
+                data["brandId"] = data.pop("brand_id")
+            if "audit_data" in data:
+                data["auditData"] = data.pop("audit_data")
+            if "created_at" in data:
+                data["createdAt"] = data.pop("created_at")
+            if "updated_at" in data:
+                data["updatedAt"] = data.pop("updated_at")
+            return super().model_validate(data, **kwargs)
+        return super().model_validate(obj, **kwargs)
 
 
 class AuditListQuery(BaseModel):

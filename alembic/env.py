@@ -9,11 +9,17 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
 from alembic import context
-from src.audit_workflows.models import AuditWorkflow
+from src.audit_workflows.models import (
+    AuditWorkflow,
+    AuditWorkflowRequiredClaim,
+    AuditWorkflowRequiredClaimSource,
+    AuditWorkflowRuleMatch,
+)
 from src.audits.models import Audit
 from src.auth.models import UserProfile
 from src.brands.models import Brand
 from src.config import settings
+from src.rules.models import EvidenceClaim, Rule, RuleEvidenceClaim
 from src.waitlist.models import WaitlistEntry
 
 config = context.config
@@ -41,7 +47,19 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 
 # Use SQLModel's metadata (models register themselves when imported above)
 # Reference models to ensure they're imported and registered
-_models = (Audit, AuditWorkflow, Brand, UserProfile, WaitlistEntry)
+_models = (
+    Audit,
+    AuditWorkflow,
+    Brand,
+    UserProfile,
+    WaitlistEntry,
+    Rule,
+    EvidenceClaim,
+    RuleEvidenceClaim,
+    AuditWorkflowRuleMatch,
+    AuditWorkflowRequiredClaim,
+    AuditWorkflowRequiredClaimSource,
+)
 assert _models  # Ensure models are imported
 SQLModel.metadata.naming_convention = POSTGRES_INDEXES_NAMING_CONVENTION
 target_metadata = SQLModel.metadata

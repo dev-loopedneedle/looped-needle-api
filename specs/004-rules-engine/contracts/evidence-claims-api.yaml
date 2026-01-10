@@ -1,0 +1,157 @@
+openapi: 3.0.0
+info:
+  title: Evidence Claims API
+  version: 1.0.0
+paths:
+  /api/v1/admin/rules/evidence-claims:
+    post:
+      summary: Create evidence claim
+      description: Create a new reusable evidence claim definition. Requires admin access.
+      tags:
+        - rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceClaimCreate'
+      responses:
+        '201':
+          description: Evidence claim created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceClaimResponse'
+        '400':
+          description: Invalid request
+        '403':
+          description: Admin access required
+    get:
+      summary: List evidence claims
+      description: Retrieve a list of all reusable evidence claims. Requires admin access.
+      tags:
+        - rules
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: List of evidence claims
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EvidenceClaimResponse'
+  /api/v1/admin/rules/evidence-claims/{claim_id}:
+    get:
+      summary: Get evidence claim
+      description: Retrieve a specific evidence claim by ID. Requires admin access.
+      tags:
+        - rules
+      parameters:
+        - name: claim_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Evidence claim retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceClaimResponse'
+        '404':
+          description: Evidence claim not found
+  /api/v1/admin/rules/evidence-claim-categories:
+    get:
+      summary: List evidence claim categories
+      description: Retrieve a list of all predefined categories for evidence claims.
+      tags:
+        - rules
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  enum: [ENVIRONMENT, SUSTAINABILITY, SOCIAL, GOVERNANCE, TRACEABILITY, OTHER]
+  /api/v1/admin/rules/evidence-claim-types:
+    get:
+      summary: List evidence claim types
+      description: Retrieve a list of all predefined types for evidence claims.
+      tags:
+        - rules
+      responses:
+        '200':
+          description: List of types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  enum: [CERTIFICATE, INVOICE, QUESTIONNAIRE, PHOTO, REPORT, OTHER]
+components:
+  schemas:
+    EvidenceClaimCreate:
+      type: object
+      required:
+        - name
+        - category
+        - type
+        - weight
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [ENVIRONMENT, SUSTAINABILITY, SOCIAL, GOVERNANCE, TRACEABILITY, OTHER]
+        type:
+          type: string
+          enum: [CERTIFICATE, INVOICE, QUESTIONNAIRE, PHOTO, REPORT, OTHER]
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+    EvidenceClaimResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        type:
+          type: string
+        weight:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+

@@ -10,18 +10,25 @@ class ErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error type or code")
     message: str = Field(..., description="Human-readable error message")
-    status_code: int = Field(..., description="HTTP status code")
-    request_id: UUID | str | None = Field(None, description="Request identifier for tracing")
+    status_code: int = Field(
+        ..., alias="statusCode", serialization_alias="statusCode", description="HTTP status code"
+    )
+    request_id: UUID | str | None = Field(
+        None,
+        alias="requestId",
+        serialization_alias="requestId",
+        description="Request identifier for tracing",
+    )
     detail: str | None = Field(None, description="Additional context about the error")
 
-    class Config:
-        """Pydantic config."""
-
-        json_schema_extra = {
+    model_config = {
+        "populate_by_name": True,
+        "json_schema_extra": {
             "example": {
                 "error": "WaitlistEntryExists",
                 "message": "Email example@email.com is already on the waitlist",
-                "status_code": 409,
-                "request_id": "c95988cc-b8b7-4047-8842-1c1d7c16cefb",
+                "statusCode": 409,
+                "requestId": "c95988cc-b8b7-4047-8842-1c1d7c16cefb",
             }
-        }
+        },
+    }

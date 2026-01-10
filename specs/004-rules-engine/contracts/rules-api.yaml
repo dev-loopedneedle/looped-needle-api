@@ -1,0 +1,74 @@
+openapi: 3.0.0
+info:
+  title: Rules API (Admin)
+  version: "0.1.0"
+paths:
+  /api/v1/admin/rules:
+    post:
+      summary: Create draft rule
+      tags: [rules]
+      responses:
+        "201":
+          description: Created
+    get:
+      summary: List rules
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/rules/{rule_id}:
+    get:
+      summary: Get rule
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+    put:
+      summary: Update draft rule
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/rules/{rule_id}/clone:
+    post:
+      summary: Clone rule to new draft version
+      tags: [rules]
+      responses:
+        "201":
+          description: Created
+  /api/v1/admin/rules/{rule_id}/publish:
+    post:
+      summary: Publish rule
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/rules/{rule_id}/disable:
+    post:
+      summary: Disable rule
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/rules/preview:
+    post:
+      summary: Preview rule expression
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/rules/evidence-claim-categories:
+    get:
+      summary: List evidence claim categories
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+  /api/v1/admin/rules/evidence-claim-types:
+    get:
+      summary: List evidence claim types
+      tags: [rules]
+      responses:
+        "200":
+          description: OK
+
