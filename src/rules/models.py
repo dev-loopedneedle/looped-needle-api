@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -83,7 +83,6 @@ class Rule(SQLModel, table=True):
     )
 
     # Relationship to evidence claims through join table
-    # Note: Defined after RuleEvidenceClaim class
 
 
 class EvidenceClaim(SQLModel, table=True):
@@ -147,6 +146,6 @@ class RuleEvidenceClaim(SQLModel, table=True):
         default=True, sa_column=Column(Boolean, nullable=False, server_default="true")
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )

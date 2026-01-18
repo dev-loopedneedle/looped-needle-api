@@ -2,7 +2,6 @@
 
 from enum import Enum
 
-# Pagination defaults
 DEFAULT_PAGE_LIMIT = 20
 MAX_PAGE_LIMIT = 50
 
@@ -13,5 +12,3 @@ class CompanySize(str, Enum):
     MICRO = "Micro"
     SME = "SME"
     LARGE = "Large"
-
-

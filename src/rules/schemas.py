@@ -37,7 +37,6 @@ class EvidenceClaimCreate(BaseModel):
     category: EvidenceClaimCategory
     type: EvidenceClaimType
     weight: float = Field(ge=0, le=1)
-    required: bool = Field(default=True, description="Whether this evidence claim is required when the rule matches")
 
 
 class EvidenceClaimResponse(BaseModel):
@@ -107,7 +106,9 @@ class RuleResponse(BaseModel):
     conditionTree: dict = Field(..., alias="conditionTree", serialization_alias="conditionTree")
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")
-    published_at: datetime | None = Field(None, alias="publishedAt", serialization_alias="publishedAt")
+    published_at: datetime | None = Field(
+        None, alias="publishedAt", serialization_alias="publishedAt"
+    )
     disabled_at: datetime | None = Field(None, alias="disabledAt", serialization_alias="disabledAt")
     evidence_claims: list[EvidenceClaimResponse] = Field(
         default_factory=list, alias="evidenceClaims", serialization_alias="evidenceClaims"
@@ -153,4 +154,3 @@ class RulePreviewResponse(BaseModel):
     valid: bool
     matched: bool | None = None
     errors: list[str] = Field(default_factory=list)
-

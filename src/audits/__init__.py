@@ -1,3 +1,1 @@
 """Audits domain module."""
-
-

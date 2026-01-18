@@ -13,7 +13,6 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlmodel import Field, SQLModel
 
@@ -21,6 +20,9 @@ from sqlmodel import Field, SQLModel
 class AuditWorkflowStatus:
     GENERATED = "GENERATED"
     STALE = "STALE"
+    PROCESSING = "PROCESSING"
+    PROCESSING_COMPLETE = "PROCESSING_COMPLETE"
+    PROCESSING_FAILED = "PROCESSING_FAILED"
 
 
 class AuditWorkflow(SQLModel, table=True):
@@ -29,10 +31,9 @@ class AuditWorkflow(SQLModel, table=True):
     __tablename__ = "audit_workflows"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('GENERATED', 'STALE')",
+            "status IN ('GENERATED', 'STALE', 'PROCESSING', 'PROCESSING_COMPLETE', 'PROCESSING_FAILED')",
             name="audit_workflows_status_check",
         ),
-        Index("idx_audit_workflows_audit_generation", "audit_id", "generation", unique=True),
     )
 
     id: UUID = Field(
@@ -47,22 +48,14 @@ class AuditWorkflow(SQLModel, table=True):
             index=True,
         )
     )
-    generation: int = Field(
-        default=1, sa_column=Column(Integer, nullable=False, server_default="1")
-    )
     status: str = Field(
         default=AuditWorkflowStatus.GENERATED,
         sa_column=Column(String, nullable=False, server_default=AuditWorkflowStatus.GENERATED),
-    )
-    generated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
     engine_version: str = Field(
         default="v1",
         sa_column=Column(String, nullable=False, server_default="v1"),
     )
-    audit_data_snapshot: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), index=True),
@@ -105,20 +98,19 @@ class AuditWorkflowRuleMatch(SQLModel, table=True):
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    match_context: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
 
 
-class AuditWorkflowRequiredClaim(SQLModel, table=True):
-    """Required evidence claim for a workflow."""
+class AuditWorkflowClaim(SQLModel, table=True):
+    """Evidence claim for a workflow."""
 
-    __tablename__ = "audit_workflow_required_claims"
+    __tablename__ = "audit_workflow_claims"
     __table_args__ = (
         CheckConstraint(
             "status IN ('REQUIRED', 'SATISFIED')",
-            name="audit_workflow_required_claims_status_check",
+            name="audit_workflow_claims_status_check",
         ),
         Index(
-            "uq_audit_workflow_required_claim",
+            "uq_audit_workflow_claim",
             "audit_workflow_id",
             "evidence_claim_id",
             unique=True,
@@ -144,10 +136,6 @@ class AuditWorkflowRequiredClaim(SQLModel, table=True):
             nullable=False,
         )
     )
-    required: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
     status: str = Field(
         default="REQUIRED",
         sa_column=Column(String, nullable=False, server_default="REQUIRED"),
@@ -162,23 +150,23 @@ class AuditWorkflowRequiredClaim(SQLModel, table=True):
     )
 
 
-class AuditWorkflowRequiredClaimSource(SQLModel, table=True):
+class AuditWorkflowClaimSource(SQLModel, table=True):
     """Sources (rules) that require a claim."""
 
-    __tablename__ = "audit_workflow_required_claim_sources"
+    __tablename__ = "audit_workflow_claim_sources"
     __table_args__ = (
         Index(
-            "pk_required_claim_source",
-            "audit_workflow_required_claim_id",
+            "pk_claim_source",
+            "audit_workflow_claim_id",
             "rule_id",
             unique=True,
         ),
     )
 
-    audit_workflow_required_claim_id: UUID = Field(
+    audit_workflow_claim_id: UUID = Field(
         sa_column=Column(
             PostgresUUID(as_uuid=True),
-            ForeignKey("audit_workflow_required_claims.id", ondelete="CASCADE"),
+            ForeignKey("audit_workflow_claims.id", ondelete="CASCADE"),
             primary_key=True,
         )
     )

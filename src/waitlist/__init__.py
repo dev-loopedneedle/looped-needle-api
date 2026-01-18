@@ -1,2 +1,1 @@
 """Waitlist domain module."""
-

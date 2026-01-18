@@ -33,4 +33,3 @@ async def list_evidence_claim_types(
 ) -> list[EvidenceClaimType]:
     """List all available evidence claim types."""
     return list(EvidenceClaimType)
-

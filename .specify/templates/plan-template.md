@@ -43,7 +43,7 @@
 
 **Testing**: Will integration tests use async test clients (`httpx.AsyncClient`)? Test structure MUST mirror source domain structure.
 
-**Code Quality**: Will code pass ruff linting? Are pre-commit hooks configured?
+**Code Quality**: Will code pass ruff linting? Are pre-commit hooks configured? Are imports at the top of files (not inside functions unless circular imports or documented exceptions)?
 
 **Database Conventions**: Do new tables/columns follow naming conventions (lower_case_snake, singular tables, `_at` suffix for datetime)? Are migrations static and revertable?
 

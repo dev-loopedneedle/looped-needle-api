@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.evidence_submissions.schemas import EvidenceEvaluationSummary
+
 
 class RuleSource(BaseModel):
     """Rule source information for traceability."""
@@ -21,46 +23,29 @@ class ClaimResponse(BaseModel):
     """Evidence claim in a workflow."""
 
     id: UUID
-    evidence_claim_id: UUID = Field(..., alias="evidenceClaimId", serialization_alias="evidenceClaimId")
-    evidence_claim_name: str = Field(..., alias="evidenceClaimName", serialization_alias="evidenceClaimName")
+    evidence_claim_id: UUID = Field(
+        ..., alias="evidenceClaimId", serialization_alias="evidenceClaimId"
+    )
+    evidence_claim_name: str = Field(
+        ..., alias="evidenceClaimName", serialization_alias="evidenceClaimName"
+    )
     evidence_claim_description: str | None = Field(
         None, alias="evidenceClaimDescription", serialization_alias="evidenceClaimDescription"
     )
     evidence_claim_category: str = Field(
         ..., alias="evidenceClaimCategory", serialization_alias="evidenceClaimCategory"
     )
-    evidence_claim_type: str = Field(..., alias="evidenceClaimType", serialization_alias="evidenceClaimType")
+    evidence_claim_type: str = Field(
+        ..., alias="evidenceClaimType", serialization_alias="evidenceClaimType"
+    )
     evidence_claim_weight: float = Field(
         ..., alias="evidenceClaimWeight", serialization_alias="evidenceClaimWeight"
     )
-    required: bool
     sources: list[RuleSource]
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
-
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        """Map snake_case model fields to camelCase API fields."""
-        if hasattr(obj, "__dict__"):
-            data = dict(obj.__dict__)
-            # Map fields to camelCase
-            field_mappings = {
-                "evidence_claim_id": "evidenceClaimId",
-                "evidence_claim_name": "evidenceClaimName",
-                "evidence_claim_description": "evidenceClaimDescription",
-                "evidence_claim_category": "evidenceClaimCategory",
-                "evidence_claim_type": "evidenceClaimType",
-                "evidence_claim_weight": "evidenceClaimWeight",
-                "created_at": "createdAt",
-                "updated_at": "updatedAt",
-            }
-            for old_key, new_key in field_mappings.items():
-                if old_key in data:
-                    data[new_key] = data.pop(old_key)
-            return super().model_validate(data, **kwargs)
-        return super().model_validate(obj, **kwargs)
 
 
 class RuleMatchResponse(BaseModel):
@@ -75,64 +60,25 @@ class RuleMatchResponse(BaseModel):
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        """Map snake_case model fields to camelCase API fields."""
-        if hasattr(obj, "__dict__"):
-            data = dict(obj.__dict__)
-            # Map fields to camelCase
-            if "rule_id" in data:
-                data["ruleId"] = data.pop("rule_id")
-            if "rule_code" in data:
-                data["ruleCode"] = data.pop("rule_code")
-            if "rule_version" in data:
-                data["ruleVersion"] = data.pop("rule_version")
-            if "evaluated_at" in data:
-                data["evaluatedAt"] = data.pop("evaluated_at")
-            return super().model_validate(data, **kwargs)
-        return super().model_validate(obj, **kwargs)
-
 
 class WorkflowResponse(BaseModel):
     """Audit workflow response."""
 
     id: UUID
     audit_id: UUID = Field(..., alias="auditId", serialization_alias="auditId")
-    generation: int
     status: str
-    generated_at: datetime = Field(..., alias="generatedAt", serialization_alias="generatedAt")
     engine_version: str = Field(..., alias="engineVersion", serialization_alias="engineVersion")
-    claims: list[ClaimResponse] = Field(
-        ..., alias="claims", serialization_alias="claims"
-    )
+    claims: list[ClaimResponse] = Field(..., alias="claims", serialization_alias="claims")
     rule_matches: list[RuleMatchResponse] | None = Field(
         None, alias="ruleMatches", serialization_alias="ruleMatches"
+    )
+    evidence_evaluations: list[EvidenceEvaluationSummary] | None = Field(
+        None, alias="evidenceEvaluations", serialization_alias="evidenceEvaluations"
     )
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
-
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        """Map snake_case model fields to camelCase API fields."""
-        if hasattr(obj, "__dict__"):
-            data = dict(obj.__dict__)
-            # Map fields to camelCase
-            field_mappings = {
-                "audit_id": "auditId",
-                "generated_at": "generatedAt",
-                "engine_version": "engineVersion",
-                "claims": "claims",
-                "rule_matches": "ruleMatches",
-                "created_at": "createdAt",
-                "updated_at": "updatedAt",
-            }
-            for old_key, new_key in field_mappings.items():
-                if old_key in data:
-                    data[new_key] = data.pop(old_key)
-            return super().model_validate(data, **kwargs)
-        return super().model_validate(obj, **kwargs)
 
 
 class WorkflowSummary(BaseModel):
@@ -140,32 +86,12 @@ class WorkflowSummary(BaseModel):
 
     id: UUID
     audit_id: UUID = Field(..., alias="auditId", serialization_alias="auditId")
-    generation: int
     status: str
-    generated_at: datetime = Field(..., alias="generatedAt", serialization_alias="generatedAt")
     engine_version: str = Field(..., alias="engineVersion", serialization_alias="engineVersion")
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
-
-    @classmethod
-    def model_validate(cls, obj, **kwargs):
-        """Map snake_case model fields to camelCase API fields."""
-        if hasattr(obj, "__dict__"):
-            data = dict(obj.__dict__)
-            field_mappings = {
-                "audit_id": "auditId",
-                "generated_at": "generatedAt",
-                "engine_version": "engineVersion",
-                "created_at": "createdAt",
-                "updated_at": "updatedAt",
-            }
-            for old_key, new_key in field_mappings.items():
-                if old_key in data:
-                    data[new_key] = data.pop(old_key)
-            return super().model_validate(data, **kwargs)
-        return super().model_validate(obj, **kwargs)
 
 
 class WorkflowListResponse(BaseModel):
@@ -177,19 +103,34 @@ class WorkflowListResponse(BaseModel):
     offset: int
 
 
-class WorkflowGenerateResponse(BaseModel):
-    """Response for workflow generation."""
+class SubmissionFileInfo(BaseModel):
+    """File information for workflow submission."""
 
-    workflow_id: UUID = Field(..., alias="workflowId", serialization_alias="workflowId")
-    audit_id: UUID = Field(..., alias="auditId", serialization_alias="auditId")
-    generation: int
-    generated_at: datetime = Field(..., alias="generatedAt", serialization_alias="generatedAt")
-    required_claims_count: int = Field(
-        ..., alias="requiredClaimsCount", serialization_alias="requiredClaimsCount"
-    )
-    matched_rules_count: int = Field(
-        ..., alias="matchedRulesCount", serialization_alias="matchedRulesCount"
-    )
+    claim_id: UUID = Field(..., alias="claimId")
+    file_path: str = Field(..., alias="filePath")
+    file_name: str = Field(..., alias="fileName")
+    file_size: int | None = Field(None, alias="fileSize")
+    mime_type: str | None = Field(None, alias="mimeType")
 
     model_config = {"populate_by_name": True}
 
+
+class WorkflowSubmissionRequest(BaseModel):
+    """Request to submit workflow with evidence files."""
+
+    submissions: list[SubmissionFileInfo]
+
+    model_config = {"populate_by_name": True}
+
+
+class WorkflowSubmissionResponse(BaseModel):
+    """Response for workflow submission."""
+
+    workflow_id: UUID = Field(..., alias="workflowId", serialization_alias="workflowId")
+    status: str
+    submission_ids: list[UUID] = Field(
+        ..., alias="submissionIds", serialization_alias="submissionIds"
+    )
+    message: str
+
+    model_config = {"populate_by_name": True}

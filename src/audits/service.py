@@ -11,6 +11,7 @@ from src.audits.exceptions import AuditNotFoundError, AuditPublishedError
 from src.audits.models import Audit, AuditStatus
 from src.audits.schemas import AuditListQuery, CreateAuditRequest, UpdateAuditRequest
 from src.auth.dependencies import UserContext
+from src.auth.exceptions import AccessDeniedError
 from src.brands.service import BrandService
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,45 @@ class AuditService:
 
         if not audit:
             raise AuditNotFoundError(audit_id)
+
+        return audit
+
+    @staticmethod
+    async def verify_audit_access(
+        db: AsyncSession,
+        audit_id: UUID,
+        current_user: UserContext,
+    ) -> Audit:
+        """
+        Verify user has access to the audit and return it.
+
+        Admins can access any audit. Brand users can only access audits from their brand.
+
+        Args:
+            db: Database session
+            audit_id: Audit ID to verify access for
+            current_user: Current user context
+
+        Returns:
+            Audit: Audit instance if access is granted
+
+        Raises:
+            AuditNotFoundError: If audit not found
+            AccessDeniedError: If user doesn't have access to this audit
+        """
+        result = await db.execute(select(Audit).where(Audit.id == audit_id))
+        audit = result.scalar_one_or_none()
+        if not audit:
+            raise AuditNotFoundError(str(audit_id))
+
+        # Admin can access any audit
+        if current_user.role == "admin":
+            return audit
+
+        # Brand users can only access audits from their brand
+        brand = await BrandService.get_brand_by_user(db, current_user.profile.id)
+        if not brand or brand.id != audit.brand_id:
+            raise AccessDeniedError("Access denied to this audit")
 
         return audit
 

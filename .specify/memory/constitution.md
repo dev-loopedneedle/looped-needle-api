@@ -1,13 +1,12 @@
 <!--
 Sync Impact Report:
-Version change: N/A → 1.0.0 (initial constitution)
-Modified principles: N/A (new constitution)
-Added sections: All sections (initial creation)
-Removed sections: N/A
+Version change: 1.0.0 → 1.1.0 (added import organization principle)
+Modified principles: VII. Code Quality & Tooling (expanded with import rules)
+Added sections: None
+Removed sections: None
 Templates requiring updates:
+  ✅ .specify/memory/constitution.md (updated)
   ✅ .specify/templates/plan-template.md (updated Constitution Check section)
-  ✅ .specify/templates/spec-template.md (aligned with FastAPI structure)
-  ✅ .specify/templates/tasks-template.md (aligned with domain-driven structure)
 Follow-up TODOs: None
 -->
 
@@ -109,7 +108,7 @@ Integration tests MUST use async test clients from day 0. Tests MUST be organize
 
 ### VII. Code Quality & Tooling
 
-Ruff MUST be used for linting and formatting. Code MUST pass all linting checks before commit. Pre-commit hooks SHOULD enforce code quality.
+Ruff MUST be used for linting and formatting. Code MUST pass all linting checks before commit. Pre-commit hooks SHOULD enforce code quality. Imports MUST be organized at the top of files.
 
 **Rules**:
 - Ruff MUST be configured for linting (`ruff check`)
@@ -117,8 +116,13 @@ Ruff MUST be used for linting and formatting. Code MUST pass all linting checks 
 - Code MUST pass linting before merge
 - Pre-commit hooks SHOULD run ruff automatically
 - Ruff replaces black, autoflake, isort, and many other tools
+- Imports MUST be placed at the top of the file, not inside functions or methods
+- Imports inside functions are ONLY permitted for:
+  - Avoiding circular import dependencies (documented with rationale)
+  - Conditional imports (platform-specific or optional dependencies)
+  - Very heavy dependencies that are rarely used (documented with rationale)
 
-**Rationale**: Ruff is fast, comprehensive, and reduces tooling complexity. Consistent formatting improves code readability and reduces merge conflicts.
+**Rationale**: Ruff is fast, comprehensive, and reduces tooling complexity. Consistent formatting improves code readability and reduces merge conflicts. Top-level imports improve code readability, enable better IDE support, make dependencies explicit, and follow Python conventions (PEP 8).
 
 ### VIII. Database Conventions
 
@@ -217,4 +221,4 @@ This constitution supersedes all other development practices and conventions. Al
 - Violations MUST be justified or fixed before merge
 - Complexity additions MUST be documented in plan.md Complexity Tracking section
 
-**Version**: 1.0.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2025-01-27
+**Version**: 1.1.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2026-01-18

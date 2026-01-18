@@ -37,3 +37,5 @@ def downgrade() -> None:
     """Remove required column from audit_workflow_required_claims."""
     op.drop_column("audit_workflow_required_claims", "required")
 
+
+

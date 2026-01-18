@@ -10,4 +10,3 @@ class WaitlistEntryExistsError(BaseAPIException):
         """Initialize exception with email."""
         message = f"Email {email} is already on the waitlist"
         super().__init__(message=message, status_code=409)
-

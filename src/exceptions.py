@@ -29,4 +29,3 @@ class DatabaseError(BaseAPIException):
 
     def __init__(self, message: str = "Database error"):
         super().__init__(message, status_code=500)
-

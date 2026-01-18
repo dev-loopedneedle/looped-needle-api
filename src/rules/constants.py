@@ -22,6 +22,5 @@ class EvidenceClaimType(StrEnum):
     CERTIFICATE = "CERTIFICATE"
     INVOICE = "INVOICE"
     QUESTIONNAIRE = "QUESTIONNAIRE"
-    PHOTO = "PHOTO"
     REPORT = "REPORT"
     OTHER = "OTHER"

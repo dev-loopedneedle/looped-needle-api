@@ -3,6 +3,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,12 +16,16 @@ from src.core.exception_handlers import register_exception_handlers
 from src.core.logging import setup_logging
 from src.core.middleware import RequestIDMiddleware
 from src.database import engine
+from src.evidence_submissions.admin_router import router as evidence_admin_router
+from src.evidence_submissions.router import router as evidence_submissions_router
+from src.experimental.router import router as experimental_router
 from src.health.router import router as health_router
 from src.rules.admin_router import router as admin_router
 from src.rules.router import router as rules_router
 from src.waitlist.router import router as waitlist_router
 
-# Setup logging first
+load_dotenv()
+
 setup_logging()
 
 logger = logging.getLogger(__name__)
@@ -54,24 +59,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add request ID middleware
 app.add_middleware(RequestIDMiddleware)
 
-# Register exception handlers
 register_exception_handlers(app)
 
-# Register routers
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(brands_router)
 app.include_router(audits_router)
 app.include_router(audit_workflows_router)
+app.include_router(evidence_submissions_router)
+app.include_router(experimental_router)
 app.include_router(admin_router)
+app.include_router(evidence_admin_router)
 app.include_router(rules_router)
 app.include_router(waitlist_router)
 
 
-# Root endpoint
 @app.get(
     "/",
     summary="Root endpoint",

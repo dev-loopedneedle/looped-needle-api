@@ -17,5 +17,3 @@ class ReferentialIntegrityError(ValidationError):
         super().__init__(
             f"Cannot delete {entity_type} with id {entity_id} because it is referenced by {referenced_by}"
         )
-
-

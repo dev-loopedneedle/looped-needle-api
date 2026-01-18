@@ -72,3 +72,5 @@ logs/
 .DS_Store
 Thumbs.db
 
+# JSON keys
+**/gen-lang-client-*.json

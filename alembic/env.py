@@ -11,8 +11,8 @@ from sqlmodel import SQLModel
 from alembic import context
 from src.audit_workflows.models import (
     AuditWorkflow,
-    AuditWorkflowRequiredClaim,
-    AuditWorkflowRequiredClaimSource,
+    AuditWorkflowClaim,
+    AuditWorkflowClaimSource,
     AuditWorkflowRuleMatch,
 )
 from src.audits.models import Audit
@@ -57,8 +57,8 @@ _models = (
     EvidenceClaim,
     RuleEvidenceClaim,
     AuditWorkflowRuleMatch,
-    AuditWorkflowRequiredClaim,
-    AuditWorkflowRequiredClaimSource,
+    AuditWorkflowClaim,
+    AuditWorkflowClaimSource,
 )
 assert _models  # Ensure models are imported
 SQLModel.metadata.naming_convention = POSTGRES_INDEXES_NAMING_CONVENTION

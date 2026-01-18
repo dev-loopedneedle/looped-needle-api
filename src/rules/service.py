@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.rules.constants import RuleState
-from src.rules.exceptions import RuleNotFoundError, RuleStateError
+from src.rules.exceptions import EvidenceClaimNotFoundError, RuleNotFoundError, RuleStateError
 from src.rules.models import EvidenceClaim, Rule, RuleEvidenceClaim
 from src.rules.schemas import EvidenceClaimCreate, RuleCreate, RuleUpdate
 
@@ -69,7 +69,7 @@ async def _upsert_claims(
     claim_creates: Iterable[EvidenceClaimCreate],
     claim_ids: Iterable[UUID],
 ) -> None:
-    # Create new claims and track their required status
+    # Create new claims (all default to required=True)
     created_claims: list[tuple[UUID, bool]] = []  # (claim_id, required)
     for payload in claim_creates:
         claim = EvidenceClaim(
@@ -82,7 +82,8 @@ async def _upsert_claims(
         )
         db.add(claim)
         await db.flush()
-        created_claims.append((claim.id, payload.required))
+        # Default to required=True for all new claims
+        created_claims.append((claim.id, True))
 
     # For existing claim IDs, default to required=True
     existing_claims: list[tuple[UUID, bool]] = [(cid, True) for cid in claim_ids]
@@ -337,8 +338,6 @@ class RuleService:
     @staticmethod
     async def get_evidence_claim(db: AsyncSession, claim_id: UUID) -> EvidenceClaim:
         """Get evidence claim by ID."""
-        from src.rules.exceptions import EvidenceClaimNotFoundError
-
         result = await db.execute(select(EvidenceClaim).where(EvidenceClaim.id == claim_id))
         claim = result.scalar_one_or_none()
         if not claim:

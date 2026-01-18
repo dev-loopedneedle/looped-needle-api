@@ -3,51 +3,31 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.audit_workflows.models import AuditWorkflow
 from src.audit_workflows.schemas import (
-    ClaimResponse,
-    RuleMatchResponse,
     WorkflowListResponse,
     WorkflowResponse,
+    WorkflowSubmissionRequest,
+    WorkflowSubmissionResponse,
     WorkflowSummary,
 )
-from src.audit_workflows.service import WorkflowService
-from src.audits.exceptions import AuditNotFoundError
+from src.audit_workflows.service import WorkflowService, WorkflowSubmissionService
+from src.audits.service import AuditService
 from src.auth.dependencies import UserContext, get_current_user
-from src.brands.service import BrandService
+from src.cloud_storage.gcs_client import get_gcs_client
 from src.database import get_db
+from src.evidence_submissions.constants import MAX_FILE_SIZE_BYTES, SUPPORTED_MIME_TYPES
+from src.evidence_submissions.exceptions import FileNotFoundError, InvalidFileError
+from src.evidence_submissions.models import EvidenceSubmission
+from src.evidence_submissions.schemas import UploadUrlRequest, UploadUrlResponse
+from src.evidence_submissions.service import SubmissionService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/audits", tags=["audit-workflows"])
-
-
-async def _verify_audit_access(
-    db: AsyncSession,
-    audit_id: UUID,
-    current_user: UserContext,
-) -> None:
-    """Verify user has access to the audit (brand owner or admin)."""
-    from sqlalchemy import select
-
-    from src.audits.models import Audit
-
-    audit_result = await db.execute(select(Audit).where(Audit.id == audit_id))
-    audit = audit_result.scalar_one_or_none()
-    if not audit:
-        raise HTTPException(status_code=404, detail="Audit not found")
-
-    # Admin can access any audit
-    if current_user.role == "admin":
-        return
-
-    # Brand users can only access audits from their brand
-    brand = await BrandService.get_brand_by_user(db, current_user.profile.id)
-    if not brand or brand.id != audit.brand_id:
-        raise HTTPException(status_code=403, detail="Access denied to this audit")
 
 
 @router.post(
@@ -55,127 +35,26 @@ async def _verify_audit_access(
     response_model=WorkflowResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate audit workflow",
-    description="Generate a new workflow generation for an audit. Works for both draft and published audits. Each call creates a new workflow generation. For published audits, the workflow uses a snapshot of the immutable audit data.",
+    description="Generate a new workflow for an audit. Works for both draft and published audits.",
 )
 async def generate_workflow(
     audit_id: UUID,
-    force: bool = Query(False, description="Unused parameter (kept for API compatibility)"),
     current_user: UserContext = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowResponse:
-    """Generate a new workflow generation for an audit."""
-    await _verify_audit_access(db, audit_id, current_user)
+    """Generate a new workflow for an audit."""
+    await AuditService.verify_audit_access(db, audit_id, current_user)
+    workflow = await WorkflowService.generate_workflow(db, audit_id)
 
-    try:
-        workflow = await WorkflowService.generate_workflow(db, audit_id, force=force)
-    except AuditNotFoundError:
-        raise HTTPException(status_code=404, detail="Audit not found") from None
-
-    return await _build_workflow_response(db, workflow)
-
-
-async def _build_workflow_response(
-    db: AsyncSession,
-    workflow: AuditWorkflow,
-) -> WorkflowResponse:
-    """Build WorkflowResponse from AuditWorkflow model."""
-    from sqlalchemy import select
-
-    from src.audit_workflows.models import (
-        AuditWorkflowRequiredClaim,
-        AuditWorkflowRequiredClaimSource,
-        AuditWorkflowRuleMatch,
-    )
-    from src.rules.models import EvidenceClaim, Rule
-
-    # Load claims with evidence claim details and sources
-    claims_stmt = (
-        select(AuditWorkflowRequiredClaim, EvidenceClaim)
-        .join(EvidenceClaim, AuditWorkflowRequiredClaim.evidence_claim_id == EvidenceClaim.id)
-        .where(AuditWorkflowRequiredClaim.audit_workflow_id == workflow.id)
-    )
-    claims_result = await db.execute(claims_stmt)
-    claims_data = claims_result.all()
-
-    claims: list[ClaimResponse] = []
-    for workflow_claim, evidence_claim in claims_data:
-        # Load sources
-        sources_stmt = select(AuditWorkflowRequiredClaimSource).where(
-            AuditWorkflowRequiredClaimSource.audit_workflow_required_claim_id == workflow_claim.id
-        )
-        sources_result = await db.execute(sources_stmt)
-        sources_data = sources_result.scalars().all()
-
-        # Load rule names
-        rule_ids = [s.rule_id for s in sources_data]
-        rules_stmt = select(Rule).where(Rule.id.in_(rule_ids))
-        rules_result = await db.execute(rules_stmt)
-        rules_map = {r.id: r for r in rules_result.scalars().all()}
-
-        sources = [
-            {
-                "rule_id": s.rule_id,
-                "rule_code": s.rule_code,
-                "rule_name": rules_map[s.rule_id].name if s.rule_id in rules_map else "Unknown",
-                "rule_version": s.rule_version,
-            }
-            for s in sources_data
-        ]
-
-        claims.append(
-            ClaimResponse(
-                id=workflow_claim.id,
-                evidence_claim_id=evidence_claim.id,
-                evidence_claim_name=evidence_claim.name,
-                evidence_claim_description=evidence_claim.description,
-                evidence_claim_category=evidence_claim.category,
-                evidence_claim_type=evidence_claim.type,
-                evidence_claim_weight=float(evidence_claim.weight),
-                required=workflow_claim.required,
-                sources=sources,
-                created_at=workflow_claim.created_at,
-                updated_at=workflow_claim.updated_at,
-            )
-        )
-
-    # Load rule matches
-    matches_stmt = select(AuditWorkflowRuleMatch).where(
-        AuditWorkflowRuleMatch.audit_workflow_id == workflow.id
-    )
-    matches_result = await db.execute(matches_stmt)
-    matches_data = matches_result.scalars().all()
-
-    rule_matches = [
-        RuleMatchResponse(
-            rule_id=m.rule_id,
-            rule_code=m.rule_code,
-            rule_version=m.rule_version,
-            matched=m.matched,
-            error=m.error,
-            evaluated_at=m.evaluated_at,
-        )
-        for m in matches_data
-    ]
-
-    return WorkflowResponse(
-        id=workflow.id,
-        audit_id=workflow.audit_id,
-        generation=workflow.generation,
-        status=workflow.status,
-        generated_at=workflow.generated_at,
-        engine_version=workflow.engine_version,
-        claims=claims,
-        rule_matches=rule_matches,
-        created_at=workflow.created_at,
-        updated_at=workflow.updated_at,
-    )
+    workflow_data = await WorkflowService.build_workflow_response(db, workflow)
+    return WorkflowResponse(**workflow_data)
 
 
 @router.get(
     "/{audit_id}/workflows",
     response_model=WorkflowListResponse,
     summary="List audit workflows",
-    description="Retrieve a paginated list of workflows for an audit, ordered by generation (newest first).",
+    description="Retrieve a paginated list of workflows for an audit, ordered by creation date (newest first).",
 )
 async def list_workflows(
     audit_id: UUID,
@@ -185,15 +64,218 @@ async def list_workflows(
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowListResponse:
     """List workflows for an audit."""
-    await _verify_audit_access(db, audit_id, current_user)
+    await AuditService.verify_audit_access(db, audit_id, current_user)
 
-    workflows, total = await WorkflowService.list_workflows(db, audit_id, limit=limit, offset=offset)
+    workflows, total = await WorkflowService.list_workflows(
+        db, audit_id, limit=limit, offset=offset
+    )
 
     return WorkflowListResponse(
         items=[WorkflowSummary.model_validate(w, from_attributes=True) for w in workflows],
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.post(
+    "/{audit_id}/workflows/{workflow_id}/upload-url",
+    response_model=UploadUrlResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate GCS upload URL for evidence file",
+    description="Generate a signed URL for direct upload to Google Cloud Storage. Frontend uses this URL to upload files directly to GCS without exposing credentials.",
+)
+async def generate_upload_url(
+    audit_id: UUID,
+    workflow_id: UUID,
+    request: UploadUrlRequest,
+    current_user: UserContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UploadUrlResponse:
+    """
+    Generate signed URL for GCS file upload.
+
+    Validates file type, size, and that the claim belongs to the workflow.
+    Optionally handles file replacement if previousFilePath is provided.
+    """
+    audit = await AuditService.verify_audit_access(db, audit_id, current_user)
+
+    # Verify workflow exists and belongs to audit
+    workflow = await WorkflowService.get_workflow_by_id(db, audit_id, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Verify claim exists and belongs to workflow
+    claim = await WorkflowService.verify_claim_belongs_to_workflow(
+        db, request.claim_id, workflow_id
+    )
+    if not claim:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Claim {request.claim_id} not found or does not belong to workflow",
+        )
+
+    # Validate file type
+    if request.mime_type not in SUPPORTED_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(SUPPORTED_MIME_TYPES)}",
+        )
+
+    # Validate file size
+    if request.file_size > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE_BYTES} bytes (50MB)",
+        )
+
+    # Handle file replacement if previousFilePath provided
+    gcs_client = get_gcs_client()
+
+    if request.previous_file_path:
+        # Validate previous file path belongs to same workflow
+        if not gcs_client.validate_path_belongs_to_workflow(
+            request.previous_file_path, audit.brand_id, audit_id, workflow_id
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Previous file path does not belong to this workflow",
+            )
+
+        # Delete old file
+        try:
+            await gcs_client.delete_file(request.previous_file_path)
+        except Exception as e:
+            logger.warning(f"Failed to delete previous file {request.previous_file_path}: {e}")
+            # Continue anyway - new file will overwrite if same path
+
+    # Generate GCS path
+    file_path = gcs_client.generate_gcs_path(
+        brand_id=audit.brand_id,
+        audit_id=audit_id,
+        workflow_id=workflow_id,
+        filename=request.file_name,
+    )
+
+    # Generate signed upload URL
+    try:
+        upload_url, expires_at = await gcs_client.generate_upload_signed_url(
+            file_path=file_path,
+            content_type=request.mime_type,
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate signed URL: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate signed URL: {str(e)}",
+        ) from e
+
+    return UploadUrlResponse(
+        upload_url=upload_url,
+        file_path=file_path,
+        expires_at=expires_at.isoformat(),
+    )
+
+
+@router.post(
+    "/{audit_id}/workflows/{workflow_id}/submit",
+    response_model=WorkflowSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Submit workflow with evidence files",
+    description="Submit an entire workflow with evidence file paths for multiple claims. Creates submission records and updates workflow status to PROCESSING. Each workflow represents one complete, immutable submission attempt. If the workflow already has submissions, it cannot be resubmitted.",
+)
+async def submit_workflow(
+    audit_id: UUID,
+    workflow_id: UUID,
+    request: WorkflowSubmissionRequest,
+    background_tasks: BackgroundTasks,
+    current_user: UserContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowSubmissionResponse:
+    """
+    Submit workflow with evidence files.
+
+    Validates file paths, creates submission records, and queues background processing.
+    Workflows are immutable once submissions are created.
+    """
+    await AuditService.verify_audit_access(db, audit_id, current_user)
+
+    # Verify workflow exists and belongs to audit
+    workflow = await WorkflowService.get_workflow_by_id(db, audit_id, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Check if workflow already has submissions (immutability check)
+    existing_submissions_count = await db.execute(
+        select(func.count(EvidenceSubmission.id)).where(
+            EvidenceSubmission.audit_workflow_id == workflow_id
+        )
+    )
+    count = existing_submissions_count.scalar() or 0
+
+    if count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Workflow {workflow_id} already has submissions and is immutable. Cannot resubmit to the same workflow.",
+        )
+
+    file_paths = [submission.file_path for submission in request.submissions]
+    try:
+        await SubmissionService.validate_file_paths(db, file_paths)
+    except (FileNotFoundError, InvalidFileError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    submission_ids = []
+    logger.info(
+        f"Creating submissions for workflow {workflow_id}: "
+        f"{len(request.submissions)} file(s) provided"
+    )
+
+    for submission_info in request.submissions:
+        # Verify claim exists and belongs to workflow
+        claim = await WorkflowService.verify_claim_belongs_to_workflow(
+            db, submission_info.claim_id, workflow_id
+        )
+        if not claim:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Claim {submission_info.claim_id} not found or does not belong to workflow",
+            )
+
+        logger.info(
+            f"Creating submission for claim {submission_info.claim_id}: {submission_info.file_name}"
+        )
+
+        try:
+            submission = await SubmissionService.create_submissions_for_workflow(
+                db=db,
+                workflow_id=workflow_id,
+                claim_id=submission_info.claim_id,
+                file_path=submission_info.file_path,
+                file_name=submission_info.file_name,
+                file_size=submission_info.file_size,
+                mime_type=submission_info.mime_type,
+            )
+            submission_ids.append(submission.id)
+            logger.info(f"Created submission {submission.id} for claim {submission_info.claim_id}")
+        except InvalidFileError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    updated_workflow = await WorkflowSubmissionService.update_workflow_status_to_processing(
+        db, workflow_id
+    )
+
+    background_tasks.add_task(
+        WorkflowSubmissionService.process_workflow_submissions_background,
+        workflow_id,
+        submission_ids,
+    )
+
+    return WorkflowSubmissionResponse(
+        workflow_id=workflow_id,
+        status=updated_workflow.status,
+        submission_ids=submission_ids,
+        message=f"Workflow submitted successfully. {len(submission_ids)} submission(s) queued for processing.",
     )
 
 
@@ -210,11 +292,11 @@ async def get_workflow_by_id(
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowResponse:
     """Get specific workflow by ID for an audit."""
-    await _verify_audit_access(db, audit_id, current_user)
+    await AuditService.verify_audit_access(db, audit_id, current_user)
 
     workflow = await WorkflowService.get_workflow_by_id(db, audit_id, workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
-    return await _build_workflow_response(db, workflow)
-
+    workflow_data = await WorkflowService.build_workflow_response(db, workflow)
+    return WorkflowResponse(**workflow_data)

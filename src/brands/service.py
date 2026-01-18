@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.audits.models import Audit
 from src.auth.dependencies import UserContext
 from src.auth.exceptions import AccessDeniedError
 from src.brands.exceptions import BrandNotFoundError, ReferentialIntegrityError
@@ -190,18 +191,10 @@ class BrandService:
         brand = await BrandService.get_brand(db, brand_id, current_user)
 
         # Check if brand is referenced by audits
-        from src.audits.models import Audit
-
-        result = await db.execute(
-            select(Audit).where(
-                Audit.brand_id == str(brand_id)
-            )
-        )
+        result = await db.execute(select(Audit).where(Audit.brand_id == str(brand_id)))
         if result.scalar_one_or_none():
             raise ReferentialIntegrityError("brand", str(brand_id), "audits")
 
         # Soft delete
         brand.deleted_at = datetime.utcnow()
         await db.commit()
-
-
