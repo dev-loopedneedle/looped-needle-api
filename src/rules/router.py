@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import UserContext
-from src.rules.constants import EvidenceClaimCategory, EvidenceClaimType, RuleState
+from src.rules.constants import (
+    EvidenceClaimCategory,
+    EvidenceClaimType,
+    RuleState,
+)
 from src.rules.dependencies import get_admin, get_session
 from src.rules.exceptions import EvidenceClaimNotFoundError, RuleNotFoundError, RuleStateError
 from src.rules.schemas import (
@@ -310,3 +314,5 @@ async def list_categories(_: UserContext = Depends(get_admin)) -> list[EvidenceC
 )
 async def list_types(_: UserContext = Depends(get_admin)) -> list[EvidenceClaimType]:
     return list(EvidenceClaimType)
+
+

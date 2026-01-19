@@ -6,7 +6,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.rules.constants import EvidenceClaimCategory, EvidenceClaimType, RuleState
+from src.rules.constants import (
+    EvidenceClaimCategory,
+    EvidenceClaimType,
+    RuleState,
+)
 
 
 def _convert_snake_to_camel(data: dict[str, Any]) -> dict[str, Any]:

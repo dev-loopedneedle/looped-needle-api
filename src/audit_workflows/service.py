@@ -18,11 +18,11 @@ from src.audit_workflows.schemas import ClaimResponse, RuleMatchResponse
 from src.audits.exceptions import AuditNotFoundError
 from src.audits.models import Audit
 from src.database import AsyncSessionLocal
-from src.evidence_submissions.constants import SubmissionStatus
+from src.evidence_submissions.constants import MatchDecision, SubmissionStatus
 from src.evidence_submissions.models import EvidenceSubmission
 from src.evidence_submissions.schemas import EvidenceEvaluationSummary
 from src.evidence_submissions.service import SubmissionService
-from src.rules.constants import RuleState
+from src.rules.constants import EvidenceClaimCategory, RuleState
 from src.rules.models import EvidenceClaim, Rule, RuleEvidenceClaim
 from src.rules.utils import validate_and_evaluate_condition_tree
 
@@ -123,6 +123,77 @@ class WorkflowSubmissionService:
             )
 
     @staticmethod
+    async def _calculate_workflow_scores(
+        db: AsyncSession,
+        workflow_id: UUID,
+        submissions: list[EvidenceSubmission],
+    ) -> tuple[int, dict]:
+        """
+        Calculate data completeness and category scores for a workflow.
+
+        Data completeness = percent of passed documents (MATCH) over total claims.
+        Category scores = weighted average of confidence scores for MATCH submissions,
+        grouped by evidence claim category.
+        """
+        claims_stmt = (
+            select(AuditWorkflowClaim, EvidenceClaim)
+            .join(EvidenceClaim, EvidenceClaim.id == AuditWorkflowClaim.evidence_claim_id)
+            .where(AuditWorkflowClaim.audit_workflow_id == workflow_id)
+        )
+        claims_result = await db.execute(claims_stmt)
+        claims_data = claims_result.all()
+
+        if not claims_data:
+            return 0, {cat.value: 0 for cat in EvidenceClaimCategory}
+
+        submission_by_claim_id: dict[UUID, EvidenceSubmission] = {}
+        for submission in submissions:
+            existing = submission_by_claim_id.get(submission.audit_workflow_claim_id)
+            if not existing or (
+                submission.processing_completed_at
+                and (
+                    not existing.processing_completed_at
+                    or submission.processing_completed_at > existing.processing_completed_at
+                )
+            ):
+                submission_by_claim_id[submission.audit_workflow_claim_id] = submission
+
+        total_claims = len(claims_data)
+        passed_claims = 0
+
+        category_totals = {cat.value: 0.0 for cat in EvidenceClaimCategory}
+        category_weights = {cat.value: 0.0 for cat in EvidenceClaimCategory}
+        category_counts = {cat.value: 0 for cat in EvidenceClaimCategory}
+
+        for workflow_claim, evidence_claim in claims_data:
+            submission = submission_by_claim_id.get(workflow_claim.id)
+            weight = float(evidence_claim.weight or 0)
+            category_key = evidence_claim.category.value
+
+            if submission and submission.match_decision == MatchDecision.MATCH:
+                passed_claims += 1
+                score = float(submission.confidence_score or 0)
+            else:
+                score = 0.0
+
+            category_totals[category_key] += score * (weight if weight > 0 else 1)
+            category_weights[category_key] += weight if weight > 0 else 1
+            category_counts[category_key] += 1
+
+        data_completeness = int(round((passed_claims / total_claims) * 100)) if total_claims else 0
+
+        category_scores: dict[str, int] = {}
+        for category, total in category_totals.items():
+            weight_total = category_weights[category]
+            if weight_total > 0:
+                category_scores[category] = int(round(total / weight_total))
+            else:
+                count = category_counts[category]
+                category_scores[category] = int(round(total / count)) if count else 0
+
+        return data_completeness, category_scores
+
+    @staticmethod
     async def update_workflow_status_after_processing(
         db: AsyncSession,
         workflow_id: UUID,
@@ -176,13 +247,15 @@ class WorkflowSubmissionService:
         for s in submissions:
             status_breakdown[s.status] = status_breakdown.get(s.status, 0) + 1
             if s.status in [SubmissionStatus.PROCESSING_FAILED, SubmissionStatus.REJECTED]:
-                failed_submissions_details.append({
-                    "submission_id": str(s.id),
-                    "file_name": s.file_name,
-                    "status": s.status,
-                    "error_message": s.error_message,
-                    "claim_id": str(s.audit_workflow_claim_id),
-                })
+                failed_submissions_details.append(
+                    {
+                        "submission_id": str(s.id),
+                        "file_name": s.file_name,
+                        "status": s.status,
+                        "error_message": s.error_message,
+                        "claim_id": str(s.audit_workflow_claim_id),
+                    }
+                )
 
         logger.info(
             f"Workflow {workflow_id} status update - Submissions breakdown:\n"
@@ -217,6 +290,17 @@ class WorkflowSubmissionService:
         else:
             # Mixed state - keep PROCESSING
             workflow.status = AuditWorkflowStatus.PROCESSING
+
+        # Calculate scores only when processing completes successfully
+        if workflow.status == AuditWorkflowStatus.PROCESSING_COMPLETE:
+            (
+                data_completeness,
+                category_scores,
+            ) = await WorkflowSubmissionService._calculate_workflow_scores(
+                db, workflow_id, submissions
+            )
+            workflow.data_completeness = data_completeness
+            workflow.category_scores = category_scores
 
         workflow.updated_at = datetime.now(UTC)
         await db.commit()
@@ -600,6 +684,8 @@ class WorkflowService:
             "audit_id": workflow.audit_id,
             "status": workflow.status,
             "engine_version": workflow.engine_version,
+            "data_completeness": workflow.data_completeness,
+            "category_scores": workflow.category_scores,
             "claims": claims,
             "rule_matches": rule_matches,
             "evidence_evaluations": evidence_evaluations,

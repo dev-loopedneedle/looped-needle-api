@@ -13,13 +13,13 @@ from sqlalchemy import (
     Integer,
     String,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlmodel import Field, SQLModel
 
 
 class AuditWorkflowStatus:
     GENERATED = "GENERATED"
-    STALE = "STALE"
     PROCESSING = "PROCESSING"
     PROCESSING_COMPLETE = "PROCESSING_COMPLETE"
     PROCESSING_FAILED = "PROCESSING_FAILED"
@@ -31,7 +31,7 @@ class AuditWorkflow(SQLModel, table=True):
     __tablename__ = "audit_workflows"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('GENERATED', 'STALE', 'PROCESSING', 'PROCESSING_COMPLETE', 'PROCESSING_FAILED')",
+            "status IN ('GENERATED', 'PROCESSING', 'PROCESSING_COMPLETE', 'PROCESSING_FAILED')",
             name="audit_workflows_status_check",
         ),
     )
@@ -56,6 +56,8 @@ class AuditWorkflow(SQLModel, table=True):
         default="v1",
         sa_column=Column(String, nullable=False, server_default="v1"),
     )
+    data_completeness: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    category_scores: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), index=True),

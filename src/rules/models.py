@@ -21,7 +21,11 @@ from sqlalchemy.dialects.postgresql import JSONB, NUMERIC
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlmodel import Field, SQLModel
 
-from src.rules.constants import EvidenceClaimCategory, EvidenceClaimType, RuleState
+from src.rules.constants import (
+    EvidenceClaimCategory,
+    EvidenceClaimType,
+    RuleState,
+)
 
 
 class Rule(SQLModel, table=True):

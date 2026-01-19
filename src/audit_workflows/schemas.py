@@ -68,6 +68,12 @@ class WorkflowResponse(BaseModel):
     audit_id: UUID = Field(..., alias="auditId", serialization_alias="auditId")
     status: str
     engine_version: str = Field(..., alias="engineVersion", serialization_alias="engineVersion")
+    data_completeness: int | None = Field(
+        None, alias="dataCompleteness", serialization_alias="dataCompleteness"
+    )
+    category_scores: dict | None = Field(
+        None, alias="categoryScores", serialization_alias="categoryScores"
+    )
     claims: list[ClaimResponse] = Field(..., alias="claims", serialization_alias="claims")
     rule_matches: list[RuleMatchResponse] | None = Field(
         None, alias="ruleMatches", serialization_alias="ruleMatches"
@@ -88,6 +94,12 @@ class WorkflowSummary(BaseModel):
     audit_id: UUID = Field(..., alias="auditId", serialization_alias="auditId")
     status: str
     engine_version: str = Field(..., alias="engineVersion", serialization_alias="engineVersion")
+    data_completeness: int | None = Field(
+        None, alias="dataCompleteness", serialization_alias="dataCompleteness"
+    )
+    category_scores: dict | None = Field(
+        None, alias="categoryScores", serialization_alias="categoryScores"
+    )
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")
 
