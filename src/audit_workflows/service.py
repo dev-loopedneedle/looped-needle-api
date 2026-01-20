@@ -20,7 +20,7 @@ from src.audits.models import Audit
 from src.database import AsyncSessionLocal
 from src.evidence_submissions.constants import MatchDecision, SubmissionStatus
 from src.evidence_submissions.models import EvidenceSubmission
-from src.evidence_submissions.schemas import EvidenceEvaluationSummary
+from src.evidence_submissions.schemas import EvidenceEvaluationSummary, Recommendation
 from src.evidence_submissions.service import SubmissionService
 from src.rules.constants import EvidenceClaimCategory, RuleState
 from src.rules.models import EvidenceClaim, Rule, RuleEvidenceClaim
@@ -83,6 +83,9 @@ class WorkflowSubmissionService:
         logger.info(
             f"Background task started: Processing workflow {workflow_id} with {len(submission_ids)} submission(s)"
         )
+        error_occurred = False
+        error_details = None
+
         # Use context manager to ensure session is always closed
         async with AsyncSessionLocal() as db_session:
             try:
@@ -92,8 +95,15 @@ class WorkflowSubmissionService:
                 await db_session.commit()
                 logger.info(f"Background task completed successfully for workflow {workflow_id}")
             except Exception as e:
+                error_occurred = True
+                error_details = {
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "error_traceback": None,
+                }
                 logger.error(
-                    f"Error in background processing task for workflow {workflow_id}: {e}",
+                    f"Error in background processing task for workflow {workflow_id}: "
+                    f"Type: {error_details['error_type']}, Message: {error_details['error_message']}",
                     exc_info=True,
                 )
                 try:
@@ -106,21 +116,26 @@ class WorkflowSubmissionService:
                     )
 
         # Update workflow status in a separate session to avoid transaction issues
-        try:
-            async with AsyncSessionLocal() as status_db:
-                workflow = await status_db.get(AuditWorkflow, workflow_id)
-                if workflow:
-                    workflow.status = AuditWorkflowStatus.PROCESSING_FAILED
-                    workflow.updated_at = datetime.now(UTC)
-                    await status_db.commit()
-                    logger.info(
-                        f"Updated workflow {workflow_id} status to PROCESSING_FAILED after error"
-                    )
-        except Exception as status_error:
-            logger.error(
-                f"Failed to update workflow {workflow_id} status after background task error: {status_error}",
-                exc_info=True,
-            )
+        # Only update to PROCESSING_FAILED if an error actually occurred
+        if error_occurred:
+            try:
+                async with AsyncSessionLocal() as status_db:
+                    workflow = await status_db.get(AuditWorkflow, workflow_id)
+                    if workflow:
+                        workflow.status = AuditWorkflowStatus.PROCESSING_FAILED
+                        workflow.updated_at = datetime.now(UTC)
+                        await status_db.commit()
+                        logger.error(
+                            f"Updated workflow {workflow_id} status to PROCESSING_FAILED after error. "
+                            f"Error Type: {error_details['error_type']}, "
+                            f"Error Message: {error_details['error_message']}"
+                        )
+            except Exception as status_error:
+                logger.error(
+                    f"Failed to update workflow {workflow_id} status after background task error: "
+                    f"Original error: {error_details}, Status update error: {status_error}",
+                    exc_info=True,
+                )
 
     @staticmethod
     async def _calculate_workflow_scores(
@@ -168,7 +183,23 @@ class WorkflowSubmissionService:
         for workflow_claim, evidence_claim in claims_data:
             submission = submission_by_claim_id.get(workflow_claim.id)
             weight = float(evidence_claim.weight or 0)
-            category_key = evidence_claim.category.value
+            # Handle both enum and string cases for category
+            category_key = (
+                evidence_claim.category.value
+                if hasattr(evidence_claim.category, "value")
+                else str(evidence_claim.category)
+            )
+
+            # Normalize to uppercase and validate against enum values
+            category_key = category_key.upper()
+
+            # Only process if category is valid (exists in our enum)
+            if category_key not in category_totals:
+                logger.warning(
+                    f"Unknown category '{category_key}' for claim {workflow_claim.id}, "
+                    f"skipping category score calculation. Valid categories: {list(category_totals.keys())}"
+                )
+                category_key = None
 
             if submission and submission.match_decision == MatchDecision.MATCH:
                 passed_claims += 1
@@ -176,9 +207,10 @@ class WorkflowSubmissionService:
             else:
                 score = 0.0
 
-            category_totals[category_key] += score * (weight if weight > 0 else 1)
-            category_weights[category_key] += weight if weight > 0 else 1
-            category_counts[category_key] += 1
+            if category_key:
+                category_totals[category_key] += score * (weight if weight > 0 else 1)
+                category_weights[category_key] += weight if weight > 0 else 1
+                category_counts[category_key] += 1
 
         data_completeness = int(round((passed_claims / total_claims) * 100)) if total_claims else 0
 
@@ -293,14 +325,23 @@ class WorkflowSubmissionService:
 
         # Calculate scores only when processing completes successfully
         if workflow.status == AuditWorkflowStatus.PROCESSING_COMPLETE:
-            (
-                data_completeness,
-                category_scores,
-            ) = await WorkflowSubmissionService._calculate_workflow_scores(
-                db, workflow_id, submissions
-            )
-            workflow.data_completeness = data_completeness
-            workflow.category_scores = category_scores
+            try:
+                (
+                    data_completeness,
+                    category_scores,
+                ) = await WorkflowSubmissionService._calculate_workflow_scores(
+                    db, workflow_id, submissions
+                )
+                workflow.data_completeness = data_completeness
+                workflow.category_scores = category_scores
+            except Exception as score_error:
+                logger.error(
+                    f"Failed to calculate workflow scores for workflow {workflow_id}: "
+                    f"Error Type: {type(score_error).__name__}, Error Message: {str(score_error)}",
+                    exc_info=True,
+                )
+                workflow.data_completeness = None
+                workflow.category_scores = None
 
         workflow.updated_at = datetime.now(UTC)
         await db.commit()
@@ -662,22 +703,45 @@ class WorkflowService:
         evidence_submissions_result = await db.execute(evidence_submissions_stmt)
         evidence_submissions = evidence_submissions_result.scalars().all()
 
-        evidence_evaluations = (
-            [
-                EvidenceEvaluationSummary(
-                    submission_id=sub.id,
-                    status=str(sub.status),
-                    overall_verdict=sub.gemini_evaluation_response.get("overallVerdict")
-                    if sub.gemini_evaluation_response
-                    else None,
-                    confidence_score=sub.confidence_score,
-                    file_name=sub.file_name,
+        evidence_evaluations = []
+        if evidence_submissions:
+            for sub in evidence_submissions:
+                # Get overallVerdict from evaluation_reasons (preferred) or gemini_evaluation_response
+                overall_verdict = None
+                if sub.evaluation_reasons:
+                    overall_verdict = sub.evaluation_reasons.get("overallVerdict")
+                if not overall_verdict and sub.gemini_evaluation_response:
+                    overall_verdict = sub.gemini_evaluation_response.get("overallVerdict")
+
+                # Extract recommendations if overallVerdict is not "pass"
+                recommendations = None
+                if overall_verdict and overall_verdict.lower() != "pass":
+                    if sub.evaluation_reasons:
+                        recommendations_data = sub.evaluation_reasons.get("recommendations")
+                        if recommendations_data:
+                            try:
+                                recommendations = [
+                                    Recommendation(**rec) if isinstance(rec, dict) else rec
+                                    for rec in recommendations_data
+                                ]
+                            except Exception as rec_error:
+                                logger.warning(
+                                    f"Failed to parse recommendations for submission {sub.id}: {rec_error}"
+                                )
+                                recommendations = None
+
+                evidence_evaluations.append(
+                    EvidenceEvaluationSummary(
+                        submission_id=sub.id,
+                        status=str(sub.status),
+                        overall_verdict=overall_verdict,
+                        confidence_score=sub.confidence_score,
+                        file_name=sub.file_name,
+                        recommendations=recommendations,
+                    )
                 )
-                for sub in evidence_submissions
-            ]
-            if evidence_submissions
-            else None
-        )
+
+        evidence_evaluations = evidence_evaluations if evidence_evaluations else None
 
         return {
             "id": workflow.id,

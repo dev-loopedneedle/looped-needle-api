@@ -1,5 +1,7 @@
 """Prompt templates for Gemini document evaluation."""
 
+from src.rules.constants import EvidenceClaimCategory
+
 
 def build_evaluation_prompt(name: str, claims_json: str) -> str:
     """
@@ -21,7 +23,7 @@ Each claim has:
 - id: numeric identifier
 - name: can be one of:
   * Document type (e.g., "CERTIFICATION", "INVOICE", "LICENSE")
-  * Category type (e.g., "ENVIRONMENT", "SUSTAINABILITY", "SOCIAL", "GOVERNANCE", "TRACEABILITY", "OTHER")
+  * Category type (e.g., {", ".join([f'"{cat.value}"' for cat in EvidenceClaimCategory])})
   * Issue date (e.g., "issue date")
 - value: the claim criteria/value to evaluate
 
@@ -63,6 +65,14 @@ EVALUATION PROCESS - Follow these steps in order:
    - Provide detailed overallVerdictReason explaining how you arrived at the verdict
    - The reason should reference specific claim results, authenticity score, visual quality, and issuer verification
    - Calculate overall confidenceScore based on claim confidences, authenticity, and issuer analysis
+
+6. SIXTH: Provide Recommendations (if overallVerdict is not "pass")
+   - If overallVerdict is "fail" or "needs_review", provide actionable recommendations
+   - Each recommendation should have:
+     * title: A brief, clear title describing the recommendation
+     * detail: Detailed explanation of what should be done and why
+   - Recommendations should help address the issues found (e.g., missing information, authenticity concerns, issuer verification problems)
+   - If overallVerdict is "pass", recommendations can be omitted or left as an empty array
 
 Scoring rules:
 - All confidence scores and authenticity scores must be integers between 0 and 100 (inclusive).

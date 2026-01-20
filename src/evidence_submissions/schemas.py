@@ -6,6 +6,15 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class Recommendation(BaseModel):
+    """Recommendation from Gemini evaluation."""
+
+    title: str
+    detail: str
+
+    model_config = {"populate_by_name": True}
+
+
 class EvaluationResult(BaseModel):
     """Evaluation result for evidence submission."""
 
@@ -50,6 +59,9 @@ class EvidenceEvaluationSummary(BaseModel):
     overall_verdict: str | None = Field(None, alias="overallVerdict", serialization_alias="overallVerdict")
     confidence_score: int | None = Field(None, alias="confidenceScore", serialization_alias="confidenceScore")
     file_name: str = Field(..., alias="fileName", serialization_alias="fileName")
+    recommendations: list[Recommendation] | None = Field(
+        None, alias="recommendations", serialization_alias="recommendations"
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -80,6 +92,9 @@ class EvidenceSubmissionDetailResponse(BaseModel):
     )
     category_detected: str | None = Field(None, alias="categoryDetected", serialization_alias="categoryDetected")
     error_message: str | None = Field(None, alias="errorMessage", serialization_alias="errorMessage")
+    recommendations: list[Recommendation] | None = Field(
+        None, alias="recommendations", serialization_alias="recommendations"
+    )
     review_decision: str | None = Field(None, alias="reviewDecision", serialization_alias="reviewDecision")
     review_notes: str | None = Field(None, alias="reviewNotes", serialization_alias="reviewNotes")
     reviewed_at: datetime | None = Field(None, alias="reviewedAt", serialization_alias="reviewedAt")

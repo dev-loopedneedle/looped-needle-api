@@ -1,7 +1,7 @@
 """Service layer for rules domain."""
 
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -78,7 +78,8 @@ async def _upsert_claims(
             category=payload.category,
             type=payload.type,
             weight=payload.weight,
-            created_at=datetime.now(timezone.utc),
+            criteria=payload.criteria or [],
+            created_at=datetime.now(UTC),
         )
         db.add(claim)
         await db.flush()
@@ -94,7 +95,7 @@ async def _upsert_claims(
     )
     # Insert links with required status and sort_order
     # Sort order is based on the position in the combined list
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     all_claims = list(created_claims) + list(existing_claims)
     for sort_order, (claim_id, required) in enumerate(all_claims, start=1):
         db.add(
@@ -196,7 +197,7 @@ class RuleService:
             claim_ids = payload.evidence_claim_ids or []
             await _upsert_claims(db, rule.id, claim_creates, claim_ids)
 
-        rule.updated_at = datetime.now(timezone.utc)
+        rule.updated_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(rule)
         return await _load_rule_with_claims(db, rule)
@@ -207,8 +208,8 @@ class RuleService:
         if rule.state != RuleState.DRAFT:
             raise RuleStateError("Only draft rules can be published")
         rule.state = RuleState.PUBLISHED
-        rule.published_at = datetime.now(timezone.utc)
-        rule.updated_at = datetime.now(timezone.utc)
+        rule.published_at = datetime.now(UTC)
+        rule.updated_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(rule)
         return await _load_rule_with_claims(db, rule)
@@ -219,8 +220,8 @@ class RuleService:
         if rule.state == RuleState.DISABLED:
             return rule
         rule.state = RuleState.DISABLED
-        rule.disabled_at = datetime.now(timezone.utc)
-        rule.updated_at = datetime.now(timezone.utc)
+        rule.disabled_at = datetime.now(UTC)
+        rule.updated_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(rule)
         return await _load_rule_with_claims(db, rule)
@@ -249,7 +250,7 @@ class RuleService:
         rule_claims = claims_result.scalars().all()
 
         # Recreate the join records with preserved required status
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for rule_claim in rule_claims:
             db.add(
                 RuleEvidenceClaim(
@@ -313,6 +314,7 @@ class RuleService:
             category=payload.category,
             type=payload.type,
             weight=payload.weight,
+            criteria=payload.criteria or [],
             created_by_user_profile_id=created_by,
         )
         db.add(claim)

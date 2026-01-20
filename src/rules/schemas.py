@@ -41,6 +41,7 @@ class EvidenceClaimCreate(BaseModel):
     category: EvidenceClaimCategory
     type: EvidenceClaimType
     weight: float = Field(ge=0, le=1)
+    criteria: list[str] = Field(default_factory=list)
 
 
 class EvidenceClaimResponse(BaseModel):
@@ -50,6 +51,7 @@ class EvidenceClaimResponse(BaseModel):
     category: EvidenceClaimCategory
     type: EvidenceClaimType
     weight: float
+    criteria: list[str] = Field(default_factory=list)
     required: bool = Field(default=True, alias="required", serialization_alias="required")
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")

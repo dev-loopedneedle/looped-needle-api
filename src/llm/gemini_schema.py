@@ -1,5 +1,7 @@
 """JSON schema for Gemini evaluation response."""
 
+from src.rules.constants import EvidenceClaimCategory
+
 
 def get_evaluation_response_schema() -> dict:
     """
@@ -39,14 +41,7 @@ def get_evaluation_response_schema() -> dict:
                     "detectedIssuer": {"type": "string"},
                     "documentCategory": {
                         "type": "string",
-                        "enum": [
-                            "ENVIRONMENT",
-                            "SUSTAINABILITY",
-                            "SOCIAL",
-                            "GOVERNANCE",
-                            "TRACEABILITY",
-                            "OTHER",
-                        ],
+                        "enum": [cat.value for cat in EvidenceClaimCategory],
                     },
                 },
                 "required": [
@@ -187,6 +182,5 @@ def get_evaluation_response_schema() -> dict:
             "visualAnalysis",
             "issuerAnalysis",
             "jurisdictionAnalysis",
-            "recommendations",
         ],
     }

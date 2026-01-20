@@ -17,7 +17,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB, NUMERIC
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, NUMERIC
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlmodel import Field, SQLModel
 
@@ -107,6 +107,10 @@ class EvidenceClaim(SQLModel, table=True):
     type: EvidenceClaimType = Field(sa_column=Column(String, nullable=False))
     weight: float = Field(
         sa_column=Column(NUMERIC(precision=5, scale=4), nullable=False, default=0)
+    )
+    criteria: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(ARRAY(String), nullable=False, server_default="{}"),
     )
     created_by_user_profile_id: UUID | None = Field(
         default=None,

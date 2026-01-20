@@ -15,6 +15,7 @@ from src.evidence_submissions.models import EvidenceSubmission
 from src.evidence_submissions.schemas import (
     EvidenceSubmissionDetailResponse,
     EvidenceSubmissionResponse,
+    Recommendation,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,4 +90,18 @@ async def get_submission_detail(
     if not submission or submission.audit_workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    return EvidenceSubmissionDetailResponse.model_validate(submission, from_attributes=True)
+    response_data = EvidenceSubmissionDetailResponse.model_validate(
+        submission, from_attributes=True
+    )
+
+    if submission.evaluation_reasons:
+        overall_verdict = submission.evaluation_reasons.get("overallVerdict", "").lower()
+        if overall_verdict != "pass":
+            recommendations_data = submission.evaluation_reasons.get("recommendations")
+            if recommendations_data:
+                response_data.recommendations = [
+                    Recommendation(**rec) if isinstance(rec, dict) else rec
+                    for rec in recommendations_data
+                ]
+
+    return response_data

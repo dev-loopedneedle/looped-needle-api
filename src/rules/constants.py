@@ -19,6 +19,7 @@ class EvidenceClaimCategory(StrEnum):
 class EvidenceClaimType(StrEnum):
     CERTIFICATE = "CERTIFICATE"
     DOCUMENT = "DOCUMENT"
+    CONTRACT = "CONTRACT"
     INVOICE = "INVOICE"
     RECEIPT = "RECEIPT"
     QUESTIONNAIRE = "QUESTIONNAIRE"

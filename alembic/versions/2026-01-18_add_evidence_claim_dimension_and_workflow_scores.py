@@ -11,41 +11,52 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision = "2026-01-18_add_evidence_claim_dimension_and_workflow_scores"
-down_revision = "2026-01-18_rename_workflow_claims_tables_and_"
+revision = "50cc8a1c45c7"
+down_revision = "54f139dfc375"  # Update this to the correct previous revision
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Add dimension to evidence_claims
-    op.add_column("evidence_claims", sa.Column("dimension", sa.String(), nullable=True))
+    # Add dimension to evidence_claims (if it doesn't exist)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col["name"] for col in inspector.get_columns("evidence_claims")]
 
-    # Backfill dimension based on existing category
-    op.execute(
-        """
-        UPDATE evidence_claims
-        SET dimension = CASE
-            WHEN category IN ('ENVIRONMENT', 'SUSTAINABILITY') THEN 'ENVIRONMENTAL'
-            WHEN category = 'SOCIAL' THEN 'SOCIAL'
-            WHEN category IN ('TRACEABILITY', 'GOVERNANCE') THEN 'TRANSPARENCY'
-            ELSE 'TRANSPARENCY'
-        END
-        """
-    )
+    if "dimension" not in columns:
+        op.add_column("evidence_claims", sa.Column("dimension", sa.String(), nullable=True))
 
-    op.alter_column("evidence_claims", "dimension", nullable=False)
+        # Backfill dimension based on existing category
+        op.execute(
+            """
+            UPDATE evidence_claims
+            SET dimension = CASE
+                WHEN category IN ('ENVIRONMENT', 'SUSTAINABILITY') THEN 'ENVIRONMENTAL'
+                WHEN category = 'SOCIAL' THEN 'SOCIAL'
+                WHEN category IN ('TRACEABILITY', 'GOVERNANCE') THEN 'TRANSPARENCY'
+                ELSE 'TRANSPARENCY'
+            END
+            """
+        )
 
-    # Add workflow scoring fields
-    op.add_column("audit_workflows", sa.Column("data_completeness", sa.Integer(), nullable=True))
-    op.add_column(
-        "audit_workflows",
-        sa.Column("dimension_scores", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    )
+        op.alter_column("evidence_claims", "dimension", nullable=False)
+
+    # Add workflow scoring fields (if they don't exist)
+    workflow_columns = [col["name"] for col in inspector.get_columns("audit_workflows")]
+
+    if "data_completeness" not in workflow_columns:
+        op.add_column(
+            "audit_workflows", sa.Column("data_completeness", sa.Integer(), nullable=True)
+        )
+
+    if "dimension_scores" not in workflow_columns:
+        op.add_column(
+            "audit_workflows",
+            sa.Column("dimension_scores", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        )
 
 
 def downgrade() -> None:
     op.drop_column("audit_workflows", "dimension_scores")
     op.drop_column("audit_workflows", "data_completeness")
     op.drop_column("evidence_claims", "dimension")
-
