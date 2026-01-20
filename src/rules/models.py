@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -71,7 +71,7 @@ class Rule(SQLModel, table=True):
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
     updated_at: datetime | None = Field(
@@ -121,7 +121,7 @@ class EvidenceClaim(SQLModel, table=True):
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
     updated_at: datetime | None = Field(
