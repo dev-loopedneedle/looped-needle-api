@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: Brands Dashboard API
+  description: API endpoint for retrieving brand dashboard data with aggregated audit metrics
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.looped-needle.com/api/v1
+    description: Production server
+
+tags:
+  - name: brands
+    description: Brand operations
+
+paths:
+  /brands/dashboard:
+    get:
+      summary: Get brand dashboard data
+      description: Retrieve aggregated dashboard data for the authenticated user's brand, including summary metrics, latest audit scores, and recent audits list
+      operationId: getBrandDashboard
+      tags:
+        - brands
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response with dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Brand not found for authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Clerk authentication
+
+  schemas:
+    DashboardResponse:
+      type: object
+      required:
+        - summary
+        - latestAuditScores
+        - recentAuditWorkflows
+      properties:
+        summary:
+          $ref: '#/components/schemas/DashboardSummary'
+        latestAuditScores:
+          $ref: '#/components/schemas/LatestAuditScores'
+        recentAuditWorkflows:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentAuditWorkflow'
+          description: List of up to 3 most recent workflows ordered by workflow created_at (newest first)
+
+    DashboardSummary:
+      type: object
+      required:
+        - totalAudits
+        - completedAudits
+      properties:
+        totalAudits:
+          type: integer
+          minimum: 0
+          description: Total number of audits for the brand
+        completedAudits:
+          type: integer
+          minimum: 0
+          description: Number of audits with completed workflows (status PROCESSING_COMPLETE)
+
+    LatestAuditScores:
+      type: object
+      nullable: true
+      required:
+        - auditId
+        - workflowId
+        - completedAt
+        - categoryScores
+      properties:
+        auditId:
+          type: string
+          format: uuid
+          description: UUID of the latest completed audit
+        workflowId:
+          type: string
+          format: uuid
+          description: UUID of the latest completed audit workflow
+        productName:
+          type: string
+          nullable: true
+          description: Product name from audit data
+        targetMarket:
+          type: string
+          nullable: true
+          description: Target market from audit data
+        completedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the audit workflow was completed
+        categoryScores:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryScore'
+          description: Category scores for the audit (Environmental, Social, Circularity, Transparency)
+        overallScore:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Average percent of all category scores (0-100, null if no scores)
+        certification:
+          type: string
+          nullable: true
+          enum: [Bronze, Silver, Gold]
+          description: Certification level based on overallScore (Bronze >60%, Silver >75%, Gold >90%, null if no certification)
+
+    RecentAuditWorkflow:
+      type: object
+      required:
+        - workflowId
+        - auditId
+        - status
+        - createdAt
+      properties:
+        workflowId:
+          type: string
+          format: uuid
+          description: UUID of the workflow
+        auditId:
+          type: string
+          format: uuid
+          description: UUID of the audit
+        productName:
+          type: string
+          nullable: true
+          description: Product name from audit data
+        targetMarket:
+          type: string
+          nullable: true
+          description: Target market from audit data
+        status:
+          type: string
+          enum: [Completed, Processing, Generated, Failed]
+          description: User-friendly display status mapped from workflow status
+        categoryScores:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/CategoryScore'
+          description: Category scores (only present if status is "Completed")
+        overallScore:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Average percent of all category scores (0-100, only present if status is "Completed")
+        certification:
+          type: string
+          nullable: true
+          enum: [Bronze, Silver, Gold]
+          description: Certification level based on overallScore (Bronze >60%, Silver >75%, Gold >90%, only present if status is "Completed")
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the workflow was created
+
+    CategoryScore:
+      type: object
+      required:
+        - category
+        - score
+        - hasClaims
+      properties:
+        category:
+          type: string
+          enum: [ENVIRONMENTAL, SOCIAL, CIRCULARITY, TRANSPARENCY]
+          description: Category name
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Numeric score for the category (0-100)
+        hasClaims:
+          type: boolean
+          description: Whether this category had any evidence claims evaluated. False means no claims existed for this category, so score of 0 indicates the category was not evaluated rather than evaluated with no match.
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code or type
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Additional error details

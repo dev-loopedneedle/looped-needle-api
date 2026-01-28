@@ -108,7 +108,6 @@ class WorkflowSubmissionService:
                 )
                 try:
                     await db_session.rollback()
-                    logger.debug(f"Rolled back database session for workflow {workflow_id}")
                 except Exception as rollback_error:
                     logger.error(
                         f"Failed to rollback database session for workflow {workflow_id}: {rollback_error}",
@@ -142,14 +141,20 @@ class WorkflowSubmissionService:
         db: AsyncSession,
         workflow_id: UUID,
         submissions: list[EvidenceSubmission],
-    ) -> tuple[int, dict]:
+    ) -> tuple[int, dict[str, dict[str, int | bool]], int | None, str | None]:
         """
-        Calculate data completeness and category scores for a workflow.
+        Calculate data completeness, category scores, overall score, and certification for a workflow.
 
         Data completeness = percent of passed documents (MATCH) over total claims.
         Category scores = weighted average of confidence scores for MATCH submissions,
         grouped by evidence claim category.
+        Overall score = weighted average of all evidence claim scores (confidence_score * weight) / sum(weights).
+        Certification = Bronze/Silver/Gold based on overall_score, only if data_completeness > 90.
         """
+        logger.info(
+            f"[_calculate_workflow_scores] Starting score calculation for workflow {workflow_id} "
+            f"with {len(submissions)} submission(s)"
+        )
         claims_stmt = (
             select(AuditWorkflowClaim, EvidenceClaim)
             .join(EvidenceClaim, EvidenceClaim.id == AuditWorkflowClaim.evidence_claim_id)
@@ -159,7 +164,15 @@ class WorkflowSubmissionService:
         claims_data = claims_result.all()
 
         if not claims_data:
-            return 0, {cat.value: 0 for cat in EvidenceClaimCategory}
+            logger.warning(
+                f"[_calculate_workflow_scores] No claims found for workflow {workflow_id}, returning zeros"
+            )
+            return (
+                0,
+                {cat.value: {"score": 0, "hasClaims": False} for cat in EvidenceClaimCategory},
+                None,
+                None,
+            )
 
         submission_by_claim_id: dict[UUID, EvidenceSubmission] = {}
         for submission in submissions:
@@ -180,9 +193,16 @@ class WorkflowSubmissionService:
         category_weights = {cat.value: 0.0 for cat in EvidenceClaimCategory}
         category_counts = {cat.value: 0 for cat in EvidenceClaimCategory}
 
+        # Calculate overall_score as weighted average of all evidence claim scores
+        total_weighted_score = 0.0
+        total_weight = 0.0
+
         for workflow_claim, evidence_claim in claims_data:
             submission = submission_by_claim_id.get(workflow_claim.id)
             weight = float(evidence_claim.weight or 0)
+            # Use weight of 1.0 if weight is 0 or None (default weight)
+            claim_weight = weight if weight > 0 else 1.0
+
             # Handle both enum and string cases for category
             category_key = (
                 evidence_claim.category.value
@@ -196,7 +216,7 @@ class WorkflowSubmissionService:
             # Only process if category is valid (exists in our enum)
             if category_key not in category_totals:
                 logger.warning(
-                    f"Unknown category '{category_key}' for claim {workflow_claim.id}, "
+                    f"[_calculate_workflow_scores] Unknown category '{category_key}' for claim {workflow_claim.id}, "
                     f"skipping category score calculation. Valid categories: {list(category_totals.keys())}"
                 )
                 category_key = None
@@ -207,23 +227,55 @@ class WorkflowSubmissionService:
             else:
                 score = 0.0
 
+            # Calculate overall_score: weighted average of all claim scores
+            total_weighted_score += score * claim_weight
+            total_weight += claim_weight
+
             if category_key:
-                category_totals[category_key] += score * (weight if weight > 0 else 1)
-                category_weights[category_key] += weight if weight > 0 else 1
+                category_totals[category_key] += score * claim_weight
+                category_weights[category_key] += claim_weight
                 category_counts[category_key] += 1
 
         data_completeness = int(round((passed_claims / total_claims) * 100)) if total_claims else 0
 
-        category_scores: dict[str, int] = {}
+        category_scores: dict[str, dict[str, int | bool]] = {}
         for category, total in category_totals.items():
             weight_total = category_weights[category]
+            has_claims = category_counts[category] > 0
+
             if weight_total > 0:
-                category_scores[category] = int(round(total / weight_total))
+                score = int(round(total / weight_total))
             else:
                 count = category_counts[category]
-                category_scores[category] = int(round(total / count)) if count else 0
+                score = int(round(total / count)) if count else 0
 
-        return data_completeness, category_scores
+            category_scores[category] = {
+                "score": score,
+                "hasClaims": has_claims,
+            }
+
+        # Calculate overall_score as weighted average of all evidence claim scores
+        # confidence_score is already 0-100, so we don't multiply by 100
+        overall_score = None
+        if total_weight > 0:
+            overall_score = int(round(total_weighted_score / total_weight))
+        else:
+            logger.error(
+                f"[_calculate_workflow_scores] Cannot calculate overall_score for workflow {workflow_id}: "
+                f"total_weight is 0"
+            )
+
+        # Calculate certification based on overall_score, but only if data_completeness > 90
+        certification = None
+        if data_completeness is not None and data_completeness > 90 and overall_score is not None:
+            if overall_score >= 90:
+                certification = "Gold"
+            elif overall_score >= 75:
+                certification = "Silver"
+            elif overall_score > 60:
+                certification = "Bronze"
+
+        return data_completeness, category_scores, overall_score, certification
 
     @staticmethod
     async def update_workflow_status_after_processing(
@@ -240,14 +292,25 @@ class WorkflowSubmissionService:
         Returns:
             AuditWorkflow: Updated workflow, or None if not found
         """
+        logger.info(
+            f"[update_workflow_status_after_processing] Starting status update for workflow {workflow_id}"
+        )
         # Get all submissions for workflow
         submissions_result = await db.execute(
             select(EvidenceSubmission).where(EvidenceSubmission.audit_workflow_id == workflow_id)
         )
         submissions = list(submissions_result.scalars().all())
 
+        logger.info(
+            f"[update_workflow_status_after_processing] Found {len(submissions)} submission(s) "
+            f"for workflow {workflow_id}"
+        )
+
         if not submissions:
             # No submissions, keep current status
+            logger.warning(
+                f"[update_workflow_status_after_processing] No submissions found for workflow {workflow_id}"
+            )
             workflow = await db.get(AuditWorkflow, workflow_id)
             return workflow if workflow else None
 
@@ -307,48 +370,124 @@ class WorkflowSubmissionService:
         # Determine workflow status
         workflow = await db.get(AuditWorkflow, workflow_id)
         if not workflow:
+            logger.error(
+                f"[update_workflow_status_after_processing] Workflow {workflow_id} not found"
+            )
             return None
 
         old_status = workflow.status
+        logger.info(
+            f"[update_workflow_status_after_processing] Workflow {workflow_id} current status: {old_status}, "
+            f"current overall_score: {workflow.overall_score}, "
+            f"current certification: {workflow.certification}"
+        )
+
+        # Check if all submissions are in a final state (no processing, no pending)
+        all_submissions_final = processing_count == 0 and completed_count + failed_count == len(
+            submissions
+        )
+
         if processing_count > 0:
-            # Still processing
+            # Still processing - some submissions are pending or processing
             workflow.status = AuditWorkflowStatus.PROCESSING
         elif failed_count > 0:
             # At least one failed
             workflow.status = AuditWorkflowStatus.PROCESSING_FAILED
         elif completed_count == len(submissions):
-            # All completed successfully
+            # All completed successfully (no processing, no failed)
             workflow.status = AuditWorkflowStatus.PROCESSING_COMPLETE
         else:
             # Mixed state - keep PROCESSING
             workflow.status = AuditWorkflowStatus.PROCESSING
 
-        # Calculate scores only when processing completes successfully
-        if workflow.status == AuditWorkflowStatus.PROCESSING_COMPLETE:
+        # Calculate scores only when ALL evidence submissions are processed and workflow is complete
+        # This ensures overall_score and certification are calculated when all evidence is evaluated
+        # Calculate if:
+        # 1. Workflow just became PROCESSING_COMPLETE (status changed) AND all submissions are final, OR
+        # 2. Workflow is PROCESSING_COMPLETE AND all submissions are final AND scores are missing
+        status_changed_to_complete = (
+            old_status != AuditWorkflowStatus.PROCESSING_COMPLETE
+            and workflow.status == AuditWorkflowStatus.PROCESSING_COMPLETE
+        )
+        # Check if scores are missing or invalid (e.g., > 100 from old buggy calculation)
+        scores_missing_or_invalid = (
+            workflow.overall_score is None
+            or workflow.certification is None
+            or (
+                workflow.overall_score is not None and workflow.overall_score > 100
+            )  # Handle legacy buggy calculations
+        )
+        should_calculate = (
+            workflow.status == AuditWorkflowStatus.PROCESSING_COMPLETE
+            and all_submissions_final
+            and (status_changed_to_complete or scores_missing_or_invalid)
+        )
+
+        logger.info(
+            f"[update_workflow_status_after_processing] Workflow {workflow_id} score calculation check: "
+            f"old_status={old_status}, "
+            f"new_status={workflow.status}, "
+            f"status_changed_to_complete={status_changed_to_complete}, "
+            f"all_submissions_final={all_submissions_final}, "
+            f"processing_count={processing_count}, "
+            f"completed_count={completed_count}, "
+            f"failed_count={failed_count}, "
+            f"total_submissions={len(submissions)}, "
+            f"current_overall_score={workflow.overall_score}, "
+            f"current_certification={workflow.certification}, "
+            f"scores_missing_or_invalid={scores_missing_or_invalid}, "
+            f"should_calculate={should_calculate}"
+        )
+        if should_calculate:
+            logger.info(
+                f"[update_workflow_status_after_processing] All evidence processed for workflow {workflow_id}. "
+                f"Calculating scores: {len(submissions)} submissions completed"
+            )
             try:
                 (
                     data_completeness,
                     category_scores,
+                    overall_score,
+                    certification,
                 ) = await WorkflowSubmissionService._calculate_workflow_scores(
                     db, workflow_id, submissions
                 )
                 workflow.data_completeness = data_completeness
                 workflow.category_scores = category_scores
+                workflow.overall_score = overall_score
+                workflow.certification = certification
+
+                logger.info(
+                    f"[update_workflow_status_after_processing] Successfully calculated and set scores "
+                    f"for workflow {workflow_id}: "
+                    f"data_completeness={data_completeness}, overall_score={overall_score}, "
+                    f"certification={certification}"
+                )
             except Exception as score_error:
                 logger.error(
-                    f"Failed to calculate workflow scores for workflow {workflow_id}: "
+                    f"[update_workflow_status_after_processing] Failed to calculate workflow scores "
+                    f"for workflow {workflow_id} after all evidence was processed: "
                     f"Error Type: {type(score_error).__name__}, Error Message: {str(score_error)}",
                     exc_info=True,
                 )
                 workflow.data_completeness = None
                 workflow.category_scores = None
+                workflow.overall_score = None
+                workflow.certification = None
+        else:
+            logger.info(
+                f"[update_workflow_status_after_processing] Skipping score calculation for workflow {workflow_id}: "
+                f"should_calculate=False"
+            )
 
         workflow.updated_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(workflow)
 
         logger.info(
-            f"Updated workflow {workflow_id} status: {old_status} → {workflow.status} "
+            f"[update_workflow_status_after_processing] Workflow {workflow_id} status updated from {old_status} "
+            f"to {workflow.status}, overall_score={workflow.overall_score}, "
+            f"certification={workflow.certification}, "
             f"(processing={processing_count}, completed={completed_count}, failed={failed_count}, total={len(submissions)})"
         )
 
@@ -357,6 +496,72 @@ class WorkflowSubmissionService:
                 f"Workflow {workflow_id} marked as PROCESSING_FAILED due to {failed_count} failed submission(s). "
                 f"Check submission error messages for details."
             )
+
+        return workflow
+
+    @staticmethod
+    async def recalculate_workflow_scores(
+        db: AsyncSession,
+        workflow_id: UUID,
+    ) -> AuditWorkflow | None:
+        """
+        Recalculate overall_score and certification for an existing completed workflow.
+
+        This is useful for workflows that were completed before the migration
+        or if scores need to be recalculated.
+
+        Args:
+            db: Database session
+            workflow_id: Workflow ID
+
+        Returns:
+            AuditWorkflow: Updated workflow, or None if not found
+        """
+        workflow = await db.get(AuditWorkflow, workflow_id)
+        if not workflow:
+            return None
+
+        if workflow.status != AuditWorkflowStatus.PROCESSING_COMPLETE:
+            logger.warning(
+                f"Cannot recalculate scores for workflow {workflow_id}: "
+                f"status is {workflow.status}, expected PROCESSING_COMPLETE"
+            )
+            return workflow
+
+        # Get all submissions for workflow
+        submissions_result = await db.execute(
+            select(EvidenceSubmission).where(EvidenceSubmission.audit_workflow_id == workflow_id)
+        )
+        submissions = list(submissions_result.scalars().all())
+
+        try:
+            (
+                data_completeness,
+                category_scores,
+                overall_score,
+                certification,
+            ) = await WorkflowSubmissionService._calculate_workflow_scores(
+                db, workflow_id, submissions
+            )
+            workflow.data_completeness = data_completeness
+            workflow.category_scores = category_scores
+            workflow.overall_score = overall_score
+            workflow.certification = certification
+            workflow.updated_at = datetime.now(UTC)
+            await db.commit()
+            await db.refresh(workflow)
+
+            logger.info(
+                f"Recalculated scores for workflow {workflow_id}: "
+                f"overall_score={overall_score}, certification={certification}"
+            )
+        except Exception as score_error:
+            logger.error(
+                f"Failed to recalculate workflow scores for workflow {workflow_id}: "
+                f"Error Type: {type(score_error).__name__}, Error Message: {str(score_error)}",
+                exc_info=True,
+            )
+            raise
 
         return workflow
 
@@ -628,6 +833,9 @@ class WorkflowService:
         Returns:
             Dictionary with workflow data ready for WorkflowResponse schema
         """
+        # Refresh workflow to ensure we have latest data (especially scores that might have been calculated)
+        await db.refresh(workflow)
+
         # Load claims with evidence claim details and sources
         claims_stmt = (
             select(AuditWorkflowClaim, EvidenceClaim)
@@ -750,6 +958,8 @@ class WorkflowService:
             "engine_version": workflow.engine_version,
             "data_completeness": workflow.data_completeness,
             "category_scores": workflow.category_scores,
+            "overall_score": workflow.overall_score,
+            "certification": workflow.certification,
             "claims": claims,
             "rule_matches": rule_matches,
             "evidence_evaluations": evidence_evaluations,

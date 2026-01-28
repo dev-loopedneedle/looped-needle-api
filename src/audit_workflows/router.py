@@ -24,6 +24,7 @@ from src.evidence_submissions.exceptions import FileNotFoundError, InvalidFileEr
 from src.evidence_submissions.models import EvidenceSubmission
 from src.evidence_submissions.schemas import UploadUrlRequest, UploadUrlResponse
 from src.evidence_submissions.service import SubmissionService
+from src.rules.dependencies import get_admin
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +296,32 @@ async def get_workflow_by_id(
     await AuditService.verify_audit_access(db, audit_id, current_user)
 
     workflow = await WorkflowService.get_workflow_by_id(db, audit_id, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    workflow_data = await WorkflowService.build_workflow_response(db, workflow)
+    return WorkflowResponse(**workflow_data)
+
+
+@router.post(
+    "/{audit_id}/workflows/{workflow_id}/recalculate-scores",
+    response_model=WorkflowResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Recalculate workflow scores (Admin only)",
+    description="Recalculate overall_score and certification for a completed workflow. "
+    "Useful for workflows completed before the migration or if scores need recalculation.",
+    tags=["admin", "audit-workflows"],
+)
+async def recalculate_workflow_scores(
+    audit_id: UUID,
+    workflow_id: UUID,
+    current_user: UserContext = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowResponse:
+    """Recalculate overall_score and certification for a workflow (Admin only)."""
+    await AuditService.verify_audit_access(db, audit_id, current_user)
+
+    workflow = await WorkflowSubmissionService.recalculate_workflow_scores(db, workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
 

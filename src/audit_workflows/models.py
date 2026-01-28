@@ -34,6 +34,10 @@ class AuditWorkflow(SQLModel, table=True):
             "status IN ('GENERATED', 'PROCESSING', 'PROCESSING_COMPLETE', 'PROCESSING_FAILED')",
             name="audit_workflows_status_check",
         ),
+        CheckConstraint(
+            "certification IS NULL OR certification IN ('Bronze', 'Silver', 'Gold')",
+            name="audit_workflows_certification_check",
+        ),
     )
 
     id: UUID = Field(
@@ -58,6 +62,16 @@ class AuditWorkflow(SQLModel, table=True):
     )
     data_completeness: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
     category_scores: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
+    overall_score: int | None = Field(
+        default=None,
+        sa_column=Column(Integer, nullable=True),
+        description="Average percent of all category scores (0-100)",
+    )
+    certification: str | None = Field(
+        default=None,
+        sa_column=Column(String, nullable=True),
+        description="Certification level: Bronze (>60%), Silver (>75%), Gold (>90%). Only awarded when data_completeness > 90",
+    )
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), index=True),

@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.evidence_submissions.schemas import EvidenceEvaluationSummary
 
@@ -74,6 +74,37 @@ class WorkflowResponse(BaseModel):
     category_scores: dict | None = Field(
         None, alias="categoryScores", serialization_alias="categoryScores"
     )
+    overall_score: int | None = Field(
+        None,
+        ge=0,
+        alias="overallScore",
+        serialization_alias="overallScore",
+        description="Average percent of all category scores (0-100)",
+    )
+    certification: str | None = Field(
+        None,
+        alias="certification",
+        serialization_alias="certification",
+        description="Certification level: Bronze (>60%), Silver (>75%), Gold (>90%). Only awarded when data_completeness > 90",
+    )
+
+    @field_validator("overall_score", mode="before")
+    @classmethod
+    def validate_overall_score(cls, v: int | None) -> int | None:
+        """Validate and clamp overall_score to 0-100 range.
+        
+        Handles legacy workflows with incorrect scores (e.g., 10000 from old buggy calculation).
+        Values > 100 are set to None to trigger recalculation.
+        """
+        if v is None:
+            return None
+        if v > 100:
+            # Legacy buggy calculation - set to None to trigger recalculation
+            return None
+        if v < 0:
+            return 0
+        return v
+
     claims: list[ClaimResponse] = Field(..., alias="claims", serialization_alias="claims")
     rule_matches: list[RuleMatchResponse] | None = Field(
         None, alias="ruleMatches", serialization_alias="ruleMatches"
@@ -99,6 +130,37 @@ class WorkflowSummary(BaseModel):
     )
     category_scores: dict | None = Field(
         None, alias="categoryScores", serialization_alias="categoryScores"
+    )
+    overall_score: int | None = Field(
+        None,
+        ge=0,
+        alias="overallScore",
+        serialization_alias="overallScore",
+        description="Average percent of all category scores (0-100)",
+    )
+
+    @field_validator("overall_score", mode="before")
+    @classmethod
+    def validate_overall_score(cls, v: int | None) -> int | None:
+        """Validate and clamp overall_score to 0-100 range.
+        
+        Handles legacy workflows with incorrect scores (e.g., 10000 from old buggy calculation).
+        Values > 100 are set to None to trigger recalculation.
+        """
+        if v is None:
+            return None
+        if v > 100:
+            # Legacy buggy calculation - set to None to trigger recalculation
+            return None
+        if v < 0:
+            return 0
+        return v
+
+    certification: str | None = Field(
+        None,
+        alias="certification",
+        serialization_alias="certification",
+        description="Certification level: Bronze (>60%), Silver (>75%), Gold (>90%). Only awarded when data_completeness > 90",
     )
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(None, alias="updatedAt", serialization_alias="updatedAt")

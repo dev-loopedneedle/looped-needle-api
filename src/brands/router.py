@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import UserContext, get_current_user
+from src.brands.exceptions import BrandNotFoundError
 from src.brands.schemas import (
     BrandCreate,
     BrandListQuery,
     BrandListResponse,
     BrandResponse,
     BrandUpdate,
+    DashboardResponse,
 )
 from src.brands.service import BrandService
 from src.core.dependencies import get_request_id
@@ -64,6 +66,29 @@ async def list_brands(
         limit=query.limit,
         offset=query.offset,
     )
+
+
+@router.get(
+    "/brands/dashboard",
+    response_model=DashboardResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get brand dashboard",
+    description="Retrieve aggregated dashboard data for the authenticated user's brand, including summary metrics, latest audit scores, and recent audits list",
+    tags=["brands"],
+)
+async def get_dashboard(
+    request_id: str | None = Depends(get_request_id),
+    current_user: UserContext = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DashboardResponse:
+    """Get dashboard data for current user's brand."""
+    logger.info("Getting dashboard data", extra={"request_id": request_id})
+    try:
+        dashboard_data = await BrandService.get_dashboard_data(db, current_user)
+        return DashboardResponse.model_validate(dashboard_data)
+    except BrandNotFoundError as e:
+        logger.warning(f"Brand not found for user: {e}", extra={"request_id": request_id})
+        raise
 
 
 @router.get(
