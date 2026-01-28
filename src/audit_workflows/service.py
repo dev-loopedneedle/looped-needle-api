@@ -62,7 +62,6 @@ class WorkflowSubmissionService:
         await db.commit()
         await db.refresh(workflow)
 
-        logger.info(f"Updated workflow {workflow_id} status to PROCESSING")
         return workflow
 
     @staticmethod
@@ -80,9 +79,6 @@ class WorkflowSubmissionService:
             workflow_id: Workflow ID
             submission_ids: List of submission IDs to process
         """
-        logger.info(
-            f"Background task started: Processing workflow {workflow_id} with {len(submission_ids)} submission(s)"
-        )
         error_occurred = False
         error_details = None
 
@@ -93,7 +89,6 @@ class WorkflowSubmissionService:
                     db_session, workflow_id, submission_ids
                 )
                 await db_session.commit()
-                logger.info(f"Background task completed successfully for workflow {workflow_id}")
             except Exception as e:
                 error_occurred = True
                 error_details = {
@@ -151,10 +146,6 @@ class WorkflowSubmissionService:
         Overall score = weighted average of all evidence claim scores (confidence_score * weight) / sum(weights).
         Certification = Bronze/Silver/Gold based on overall_score, only if data_completeness > 90.
         """
-        logger.info(
-            f"[_calculate_workflow_scores] Starting score calculation for workflow {workflow_id} "
-            f"with {len(submissions)} submission(s)"
-        )
         claims_stmt = (
             select(AuditWorkflowClaim, EvidenceClaim)
             .join(EvidenceClaim, EvidenceClaim.id == AuditWorkflowClaim.evidence_claim_id)
@@ -292,19 +283,11 @@ class WorkflowSubmissionService:
         Returns:
             AuditWorkflow: Updated workflow, or None if not found
         """
-        logger.info(
-            f"[update_workflow_status_after_processing] Starting status update for workflow {workflow_id}"
-        )
         # Get all submissions for workflow
         submissions_result = await db.execute(
             select(EvidenceSubmission).where(EvidenceSubmission.audit_workflow_id == workflow_id)
         )
         submissions = list(submissions_result.scalars().all())
-
-        logger.info(
-            f"[update_workflow_status_after_processing] Found {len(submissions)} submission(s) "
-            f"for workflow {workflow_id}"
-        )
 
         if not submissions:
             # No submissions, keep current status
@@ -352,15 +335,6 @@ class WorkflowSubmissionService:
                     }
                 )
 
-        logger.info(
-            f"Workflow {workflow_id} status update - Submissions breakdown:\n"
-            f"  - Total submissions: {len(submissions)}\n"
-            f"  - Processing: {processing_count} (PENDING_PROCESSING or PROCESSING)\n"
-            f"  - Completed: {completed_count} (PROCESSING_COMPLETE, ACCEPTED, or NEEDS_REVIEW)\n"
-            f"  - Failed: {failed_count} (PROCESSING_FAILED or REJECTED)\n"
-            f"  - Status breakdown: {status_breakdown}"
-        )
-
         if failed_submissions_details:
             logger.warning(
                 f"Workflow {workflow_id} has {failed_count} failed submission(s): "
@@ -376,11 +350,6 @@ class WorkflowSubmissionService:
             return None
 
         old_status = workflow.status
-        logger.info(
-            f"[update_workflow_status_after_processing] Workflow {workflow_id} current status: {old_status}, "
-            f"current overall_score: {workflow.overall_score}, "
-            f"current certification: {workflow.certification}"
-        )
 
         # Check if all submissions are in a final state (no processing, no pending)
         all_submissions_final = processing_count == 0 and completed_count + failed_count == len(
@@ -423,21 +392,6 @@ class WorkflowSubmissionService:
             and (status_changed_to_complete or scores_missing_or_invalid)
         )
 
-        logger.info(
-            f"[update_workflow_status_after_processing] Workflow {workflow_id} score calculation check: "
-            f"old_status={old_status}, "
-            f"new_status={workflow.status}, "
-            f"status_changed_to_complete={status_changed_to_complete}, "
-            f"all_submissions_final={all_submissions_final}, "
-            f"processing_count={processing_count}, "
-            f"completed_count={completed_count}, "
-            f"failed_count={failed_count}, "
-            f"total_submissions={len(submissions)}, "
-            f"current_overall_score={workflow.overall_score}, "
-            f"current_certification={workflow.certification}, "
-            f"scores_missing_or_invalid={scores_missing_or_invalid}, "
-            f"should_calculate={should_calculate}"
-        )
         if should_calculate:
             logger.info(
                 f"[update_workflow_status_after_processing] All evidence processed for workflow {workflow_id}. "
@@ -456,13 +410,6 @@ class WorkflowSubmissionService:
                 workflow.category_scores = category_scores
                 workflow.overall_score = overall_score
                 workflow.certification = certification
-
-                logger.info(
-                    f"[update_workflow_status_after_processing] Successfully calculated and set scores "
-                    f"for workflow {workflow_id}: "
-                    f"data_completeness={data_completeness}, overall_score={overall_score}, "
-                    f"certification={certification}"
-                )
             except Exception as score_error:
                 logger.error(
                     f"[update_workflow_status_after_processing] Failed to calculate workflow scores "
@@ -474,22 +421,10 @@ class WorkflowSubmissionService:
                 workflow.category_scores = None
                 workflow.overall_score = None
                 workflow.certification = None
-        else:
-            logger.info(
-                f"[update_workflow_status_after_processing] Skipping score calculation for workflow {workflow_id}: "
-                f"should_calculate=False"
-            )
 
         workflow.updated_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(workflow)
-
-        logger.info(
-            f"[update_workflow_status_after_processing] Workflow {workflow_id} status updated from {old_status} "
-            f"to {workflow.status}, overall_score={workflow.overall_score}, "
-            f"certification={workflow.certification}, "
-            f"(processing={processing_count}, completed={completed_count}, failed={failed_count}, total={len(submissions)})"
-        )
 
         if failed_count > 0:
             logger.warning(
@@ -551,10 +486,6 @@ class WorkflowSubmissionService:
             await db.commit()
             await db.refresh(workflow)
 
-            logger.info(
-                f"Recalculated scores for workflow {workflow_id}: "
-                f"overall_score={overall_score}, certification={certification}"
-            )
         except Exception as score_error:
             logger.error(
                 f"Failed to recalculate workflow scores for workflow {workflow_id}: "
@@ -609,11 +540,6 @@ class WorkflowService:
         rules_stmt = select(Rule).where(Rule.state == RuleState.PUBLISHED)
         rules_result = await db.execute(rules_stmt)
         published_rules: list[Rule] = list(rules_result.scalars().all())
-
-        logger.info(
-            f"Generating workflow for audit {audit_id}, "
-            f"evaluating {len(published_rules)} published rules"
-        )
 
         matched_rules: list[Rule] = []
         rule_matches: list[AuditWorkflowRuleMatch] = []
@@ -722,11 +648,6 @@ class WorkflowService:
 
         await db.commit()
         await db.refresh(workflow)
-
-        logger.info(
-            f"Workflow {workflow.id} generated: {len(matched_rules)}/{len(published_rules)} rules matched, "
-            f"{len(workflow_claims)} claims, {len(rule_matches)} rule evaluations"
-        )
 
         return workflow
 

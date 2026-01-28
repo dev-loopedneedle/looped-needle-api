@@ -92,7 +92,7 @@ class WorkflowResponse(BaseModel):
     @classmethod
     def validate_overall_score(cls, v: int | None) -> int | None:
         """Validate and clamp overall_score to 0-100 range.
-        
+
         Handles legacy workflows with incorrect scores (e.g., 10000 from old buggy calculation).
         Values > 100 are set to None to trigger recalculation.
         """
@@ -143,7 +143,7 @@ class WorkflowSummary(BaseModel):
     @classmethod
     def validate_overall_score(cls, v: int | None) -> int | None:
         """Validate and clamp overall_score to 0-100 range.
-        
+
         Handles legacy workflows with incorrect scores (e.g., 10000 from old buggy calculation).
         Values > 100 are set to None to trigger recalculation.
         """

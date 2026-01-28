@@ -227,11 +227,6 @@ async def submit_workflow(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     submission_ids = []
-    logger.info(
-        f"Creating submissions for workflow {workflow_id}: "
-        f"{len(request.submissions)} file(s) provided"
-    )
-
     for submission_info in request.submissions:
         # Verify claim exists and belongs to workflow
         claim = await WorkflowService.verify_claim_belongs_to_workflow(
@@ -242,10 +237,6 @@ async def submit_workflow(
                 status_code=400,
                 detail=f"Claim {submission_info.claim_id} not found or does not belong to workflow",
             )
-
-        logger.info(
-            f"Creating submission for claim {submission_info.claim_id}: {submission_info.file_name}"
-        )
 
         try:
             submission = await SubmissionService.create_submissions_for_workflow(
@@ -258,7 +249,6 @@ async def submit_workflow(
                 mime_type=submission_info.mime_type,
             )
             submission_ids.append(submission.id)
-            logger.info(f"Created submission {submission.id} for claim {submission_info.claim_id}")
         except InvalidFileError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
