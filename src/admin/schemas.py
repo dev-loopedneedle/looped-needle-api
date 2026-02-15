@@ -49,6 +49,18 @@ class CertificationBreakdown(BaseModel):
     gold: int = Field(..., ge=0, description="Completed workflows with Gold")
 
 
+class WorkflowsCompletedOverTimeItem(BaseModel):
+    """Completed and passed workflow counts for a single day."""
+
+    date: str = Field(..., description="Date in ISO format (YYYY-MM-DD)")
+    completed: int = Field(..., ge=0, description="Number of workflows completed that day")
+    passed: int = Field(
+        ...,
+        ge=0,
+        description="Number of completed workflows with certification (Bronze/Silver/Gold) that day",
+    )
+
+
 class RecentWorkflowItem(BaseModel):
     """Single workflow in the recent workflows list."""
 
@@ -95,6 +107,12 @@ class AdminDashboardResponse(BaseModel):
         ...,
         alias="certificationBreakdown",
         serialization_alias="certificationBreakdown",
+    )
+    workflows_completed_over_time: list[WorkflowsCompletedOverTimeItem] = Field(
+        ...,
+        alias="workflowsCompletedOverTime",
+        serialization_alias="workflowsCompletedOverTime",
+        description="Completed and passed count per day for the last 30 days",
     )
     recent_workflows: list[RecentWorkflowItem] = Field(
         ...,

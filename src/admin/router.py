@@ -8,6 +8,7 @@ from src.admin.schemas import (
     AdminDashboardSummary,
     CertificationBreakdown,
     RecentWorkflowItem,
+    WorkflowsCompletedOverTimeItem,
 )
 from src.admin.service import get_dashboard_data
 from src.database import get_db
@@ -27,10 +28,14 @@ async def get_dashboard(
     _: None = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ) -> AdminDashboardResponse:
-    """Return platform-wide dashboard data (summary, certification breakdown, recent workflows)."""
+    """Return platform-wide dashboard data (summary, certification breakdown, workflows over time, recent workflows)."""
     data = await get_dashboard_data(db)
     summary = AdminDashboardSummary(**data["summary"])
     certification_breakdown = CertificationBreakdown(**data["certification_breakdown"])
+    workflows_completed_over_time = [
+        WorkflowsCompletedOverTimeItem(date=item["date"], completed=item["completed"], passed=item["passed"])
+        for item in data["workflows_completed_over_time"]
+    ]
     recent_workflows = [
         RecentWorkflowItem(
             workflow_id=item["workflow_id"],
@@ -45,5 +50,6 @@ async def get_dashboard(
     return AdminDashboardResponse(
         summary=summary,
         certification_breakdown=certification_breakdown,
+        workflows_completed_over_time=workflows_completed_over_time,
         recent_workflows=recent_workflows,
     )

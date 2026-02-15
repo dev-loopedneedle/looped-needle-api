@@ -68,6 +68,34 @@ async def test_admin_dashboard_certification_breakdown(
 
 
 @pytest.mark.asyncio
+async def test_admin_dashboard_workflows_completed_over_time(
+    client: AsyncClient, admin_headers: dict
+):
+    """GET /api/v1/admin/dashboard as admin returns workflowsCompletedOverTime (last 30 days)."""
+    response = await client.get(
+        "/api/v1/admin/dashboard",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "workflowsCompletedOverTime" in data
+    over_time = data["workflowsCompletedOverTime"]
+    assert isinstance(over_time, list)
+    # Last 30 days inclusive = 30 or 31 items depending on exact window
+    assert 30 <= len(over_time) <= 31
+    for item in over_time:
+        assert "date" in item
+        assert "completed" in item
+        assert "passed" in item
+        assert isinstance(item["date"], str)
+        assert isinstance(item["completed"], int)
+        assert isinstance(item["passed"], int)
+        assert item["completed"] >= 0
+        assert item["passed"] >= 0
+        assert item["passed"] <= item["completed"]
+
+
+@pytest.mark.asyncio
 async def test_admin_dashboard_recent_workflows(
     client: AsyncClient, admin_headers: dict
 ):
@@ -102,6 +130,7 @@ async def test_admin_dashboard_contract_response_shape(
     # Required top-level
     assert "summary" in data
     assert "certificationBreakdown" in data
+    assert "workflowsCompletedOverTime" in data
     assert "recentWorkflows" in data
     # Summary
     assert "activeClients" in data["summary"]
@@ -139,4 +168,6 @@ async def test_admin_dashboard_empty_data_returns_200(
     assert data["certificationBreakdown"]["bronze"] >= 0
     assert data["certificationBreakdown"]["silver"] >= 0
     assert data["certificationBreakdown"]["gold"] >= 0
+    assert isinstance(data["workflowsCompletedOverTime"], list)
+    assert 30 <= len(data["workflowsCompletedOverTime"]) <= 31
     assert isinstance(data["recentWorkflows"], list)

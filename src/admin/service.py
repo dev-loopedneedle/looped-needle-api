@@ -1,9 +1,9 @@
 """Admin dashboard service: platform-wide metrics and recent workflows."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import Date, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.admin.constants import PROCESSING_COMPLETE, RECENT_WORKFLOWS_LIMIT
@@ -101,6 +101,33 @@ async def get_dashboard_data(db: AsyncSession) -> dict[str, Any]:
     silver = silver_result.scalar_one() or 0
     gold = gold_result.scalar_one() or 0
 
+    # --- Workflows completed over time: completed and passed per day, last 30 days (UTC)
+    workflows_over_time_q = (
+        select(
+            cast(AuditWorkflow.updated_at, Date).label("day"),
+            func.count().label("completed"),
+            func.count(AuditWorkflow.certification).label("passed"),
+        )
+        .where(
+            AuditWorkflow.status == PROCESSING_COMPLETE,
+            AuditWorkflow.updated_at.isnot(None),
+            AuditWorkflow.updated_at >= cutoff_30d,
+        )
+        .group_by(cast(AuditWorkflow.updated_at, Date))
+    )
+    over_time_result = await db.execute(workflows_over_time_q)
+    over_time_rows = over_time_result.all()
+
+    # Build dict and fill all 31 days (inclusive) with 0 where no activity
+    counts_by_day: dict[date, tuple[int, int]] = {row.day: (row.completed, row.passed) for row in over_time_rows}
+    start_date = cutoff_30d.date()
+    end_date = now_utc.date()
+    workflows_completed_over_time: list[dict[str, Any]] = []
+    for i in range((end_date - start_date).days + 1):
+        d = start_date + timedelta(days=i)
+        completed, passed = counts_by_day.get(d, (0, 0))
+        workflows_completed_over_time.append({"date": d.isoformat(), "completed": completed, "passed": passed})
+
     # --- Recent workflows: join workflow + audit, order by workflow.updated_at DESC, limit 10
     recent_q = (
         select(AuditWorkflow, Audit)
@@ -138,5 +165,6 @@ async def get_dashboard_data(db: AsyncSession) -> dict[str, Any]:
             "pass_rate": pass_rate,
         },
         "certification_breakdown": {"bronze": bronze, "silver": silver, "gold": gold},
+        "workflows_completed_over_time": workflows_completed_over_time,
         "recent_workflows": recent_workflows,
     }
