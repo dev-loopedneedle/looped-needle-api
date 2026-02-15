@@ -6,44 +6,20 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-# Type aliases for Literal types
-ProductCategory = Literal[
-    "T-Shirt",
-    "Jacket",
-    "Pants",
-    "Dress",
-    "Accessories",
-    "Footwear",
-    "Outerwear",
-    "Other",
-]
-
 
 # Nested schemas
 class ProductInfo(BaseModel):
     """Product information schema."""
 
     productName: str | None = Field(None, description="Product name (optional)")
-    productCategory: (
-        Literal[
-            "T-Shirt",
-            "Jacket",
-            "Pants",
-            "Dress",
-            "Accessories",
-            "Footwear",
-            "Outerwear",
-            "Other",
-        ]
-        | None
-    ) = Field(None, description="Product category (optional)")
+    productCategory: str | None = Field(None, description="Product category (optional)")
     description: str | None = Field(None, description="Product description (optional)")
     auditScope: Literal["Single Product", "Collection", "Brand-wide"] | None = Field(
         None, description="Audit scope (optional)"
     )
     targetMarket: str | None = Field(None, description="Target market (optional)")
 
-    @field_validator("description", "productName", "targetMarket")
+    @field_validator("description", "productName", "targetMarket", "productCategory")
     @classmethod
     def empty_string_to_none(cls, v: str | None) -> str | None:
         """Convert empty strings to None."""
@@ -141,15 +117,14 @@ class Sustainability(BaseModel):
     """Sustainability schema."""
 
     environmental: Environmental | None = Field(None, description="Environmental (optional)")
-    primaryEnergySource: (
-        Literal[
-            "Renewable Energy (Solar/Wind)",
-            "Grid Electricity",
-            "Mixed (Renewable + Grid)",
-            "Other",
-        ]
-        | None
-    ) = Field(None, description="Primary energy source (optional)")
+    primaryEnergySource: str | None = Field(None, description="Primary energy source (optional)")
+
+    @field_validator("primaryEnergySource")
+    @classmethod
+    def empty_string_to_none_energy(cls, v: str | None) -> str | None:
+        """Convert empty strings to None."""
+        return None if v == "" else v
+
     social: Social | None = Field(None, description="Social (optional)")
     circularity: Circularity | None = Field(None, description="Circularity (optional)")
 
@@ -171,7 +146,10 @@ class CreateAuditRequest(BaseModel):
         ..., alias="brandId", serialization_alias="brandId", description="Brand ID (required)"
     )
     audit_data: AuditData | None = Field(
-        None, alias="auditData", serialization_alias="auditData", description="Audit data (optional for drafts)"
+        None,
+        alias="auditData",
+        serialization_alias="auditData",
+        description="Audit data (optional for drafts)",
     )
 
     model_config = {"populate_by_name": True}
@@ -184,7 +162,10 @@ class UpdateAuditRequest(BaseModel):
         None, alias="brandId", serialization_alias="brandId", description="Brand ID (optional)"
     )
     audit_data: AuditData | None = Field(
-        None, alias="auditData", serialization_alias="auditData", description="Audit data (optional)"
+        None,
+        alias="auditData",
+        serialization_alias="auditData",
+        description="Audit data (optional)",
     )
 
     model_config = {"populate_by_name": True}
@@ -197,11 +178,17 @@ class AuditResponse(BaseModel):
     brand_id: UUID = Field(..., alias="brandId", serialization_alias="brandId")
     status: Literal["DRAFT", "PUBLISHED"]
     audit_data: AuditData | None = Field(
-        None, alias="auditData", serialization_alias="auditData", description="Audit data (optional for drafts)"
+        None,
+        alias="auditData",
+        serialization_alias="auditData",
+        description="Audit data (optional for drafts)",
     )
     created_at: datetime = Field(..., alias="createdAt", serialization_alias="createdAt")
     updated_at: datetime | None = Field(
-        None, alias="updatedAt", serialization_alias="updatedAt", description="Last update timestamp"
+        None,
+        alias="updatedAt",
+        serialization_alias="updatedAt",
+        description="Last update timestamp",
     )
 
     model_config = {"from_attributes": True, "populate_by_name": True}
