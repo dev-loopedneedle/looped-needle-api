@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.admin.router import router as admin_dashboard_router
 from src.audit_workflows.router import router as audit_workflows_router
 from src.audits.router import router as audits_router
 from src.auth.router import router as auth_router
@@ -71,6 +72,7 @@ app.include_router(audit_workflows_router)
 app.include_router(evidence_submissions_router)
 app.include_router(experimental_router)
 app.include_router(admin_router)
+app.include_router(admin_dashboard_router)
 app.include_router(evidence_admin_router)
 app.include_router(rules_router)
 app.include_router(waitlist_router)
