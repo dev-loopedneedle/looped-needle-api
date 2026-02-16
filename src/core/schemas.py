@@ -26,7 +26,7 @@ class ErrorResponse(BaseModel):
         "json_schema_extra": {
             "example": {
                 "error": "WaitlistEntryExists",
-                "message": "Email example@email.com is already on the waitlist",
+                "message": "You're already on the waitlist",
                 "statusCode": 409,
                 "requestId": "c95988cc-b8b7-4047-8842-1c1d7c16cefb",
             }

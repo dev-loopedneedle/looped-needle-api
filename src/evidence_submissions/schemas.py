@@ -109,6 +109,19 @@ class EvidenceSubmissionDetailResponse(BaseModel):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class DownloadUrlResponse(BaseModel):
+    """Response with signed download URL for evidence file."""
+
+    download_url: str = Field(
+        ...,
+        alias="downloadUrl",
+        serialization_alias="downloadUrl",
+        description="Signed URL for downloading the file (PDFs/images display in browser, others download)",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
 class EvidenceEvaluationReportResponse(BaseModel):
     """Full Gemini evaluation report for admin (includes full gemini_evaluation_response)."""
 

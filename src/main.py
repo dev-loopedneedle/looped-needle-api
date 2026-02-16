@@ -23,6 +23,7 @@ from src.experimental.router import router as experimental_router
 from src.health.router import router as health_router
 from src.rules.admin_router import router as admin_router
 from src.rules.router import router as rules_router
+from src.waitlist.admin_router import router as waitlist_admin_router
 from src.waitlist.router import router as waitlist_router
 
 load_dotenv()
@@ -74,6 +75,7 @@ app.include_router(experimental_router)
 app.include_router(admin_router)
 app.include_router(admin_dashboard_router)
 app.include_router(evidence_admin_router)
+app.include_router(waitlist_admin_router)
 app.include_router(rules_router)
 app.include_router(waitlist_router)
 

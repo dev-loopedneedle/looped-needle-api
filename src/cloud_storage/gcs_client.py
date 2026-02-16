@@ -205,6 +205,37 @@ class GCSClient:
         signed_url = await asyncio.to_thread(_generate_url)
         return signed_url, expires_at
 
+    async def generate_download_signed_url(
+        self, file_path: str, expiration_minutes: int | None = None
+    ) -> str:
+        """
+        Generate a signed URL for downloading a file from GCS (GET method).
+
+        Args:
+            file_path: GCS path to the file
+            expiration_minutes: URL expiration time in minutes (default: from settings)
+
+        Returns:
+            Signed URL string for downloading the file
+        """
+        expiration_minutes = expiration_minutes or settings.gcs_signed_url_expiration_minutes
+
+        def _generate_url() -> str:
+            bucket = self._get_bucket()
+            blob = bucket.blob(file_path)
+            url = blob.generate_signed_url(
+                version="v4",
+                method="GET",
+                expiration=timedelta(minutes=expiration_minutes),
+            )
+            logger.info(
+                f"Generated download signed URL for {file_path}, "
+                f"expires in {expiration_minutes} minutes"
+            )
+            return url
+
+        return await asyncio.to_thread(_generate_url)
+
     async def file_exists(self, file_path: str) -> bool:
         """
         Check if a file exists in GCS.

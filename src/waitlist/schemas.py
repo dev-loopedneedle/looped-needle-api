@@ -34,3 +34,12 @@ class WaitlistResponse(BaseModel):
                 data["createdAt"] = data.pop("created_at")
             return super().model_validate(data, **kwargs)
         return super().model_validate(obj, **kwargs)
+
+
+class WaitlistListResponse(BaseModel):
+    """Schema for paginated waitlist list response."""
+
+    items: list[WaitlistResponse] = Field(..., description="List of waitlist entries")
+    total: int = Field(..., ge=0, description="Total number of entries")
+    limit: int = Field(..., ge=1, description="Maximum number of records returned")
+    offset: int = Field(..., ge=0, description="Number of records skipped")
